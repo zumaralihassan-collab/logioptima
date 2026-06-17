@@ -1,8 +1,8 @@
-# LogiOptima — Global Transportation & Logistics Optimization
+# Zumar's Logic-tics Stop — Global Transportation & Logistics Optimization
 
-An interactive, AI-assisted decision-support tool for transportation and logistics. It uses operations-research solvers and real freight-economics data to **predict, suggest, and explain** logistics operations — from a single delivery route to global crude-oil shipping networks.
+An interactive, AI-assisted decision-support tool for transportation and logistics. It uses operations-research solvers and real freight-economics data to **predict, suggest, and explain** logistics operations — from a single delivery route to global multi-modal shipping networks.
 
-**Live demo:** _(GitHub Pages URL appears here once deployed)_
+**Live demo:** https://zumaralihassan-collab.github.io/logioptima/
 
 ![status](https://img.shields.io/badge/status-prototype-blue) ![type](https://img.shields.io/badge/stack-static%20HTML%20%2B%20JS-success) ![ai](https://img.shields.io/badge/AI-bring--your--own--key-purple)
 
@@ -10,8 +10,8 @@ An interactive, AI-assisted decision-support tool for transportation and logisti
 
 Four connected views in one self-contained app:
 
-- **🌍 Global Network** — a world map of major real-world crude-oil shipping lanes (Middle East → Asia/Europe, US Gulf exports, West Africa, Russia, Brazil) plus a multi-port tanker **voyage optimizer** (Traveling Salesman Problem with nearest-neighbor + 2-opt).
-- **⚡ Route Optimizer** — interactive TSP, Vehicle Routing (VRP), facility location, and min-cost network-flow solvers with live maps, KPIs, and strategy comparison.
+- **🌍 World Planner** — a real interactive world map (Leaflet + OpenStreetMap/CARTO). Type any city with built-in autocomplete (~115 global cities) or geocode any address worldwide. Two toggleable modes: a **multi-city route planner** (TSP on real great-circle distances, with road/air/ocean/rail cost, time, and CO₂) and a **hub designer** (facility location — picks which cities to open as hubs). Customizable insight cards (longest leg, mode recommendation, center-of-gravity) and a live AI overview.
+- **⚡ Route Sandbox** — abstract TSP, Vehicle Routing (VRP), facility location, and min-cost network-flow solvers with KPIs and strategy comparison.
 - **📊 Executive Dashboard** — U.S. freight modal split (by value and by weight), a collapsible commodity → ideal-mode matrix, international trade by mode, and strategic insight cards.
 - **💰 Cost Optimization** — a multi-modal cost & transit comparator (same shipment across truck / rail / ocean / air / pipeline, domestic vs import/export), an import/export/freight-forwarding cost stack, and a carrier-mode rate reference.
 

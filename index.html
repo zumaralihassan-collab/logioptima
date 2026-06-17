@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LogiOptima — Global Transportation & Logistics Optimization</title>
+<title>Zumar's Logic-tics Stop — Global Transportation & Logistics Optimization</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -118,8 +118,8 @@
 </head>
 <body>
 <header>
-  <div class="logo">L</div>
-  <div><h1>LogiOptima</h1><div class="tag">Global Transportation &amp; Logistics Optimization</div></div>
+  <div class="logo">Z</div>
+  <div><h1>Zumar's Logic-tics Stop</h1><div class="tag">Global Transportation &amp; Logistics Optimization</div></div>
   <nav>
     <button class="active" data-view="global">🌍 World Planner</button>
     <button data-view="optimizer">⚡ Route Sandbox</button>
@@ -578,7 +578,7 @@ function offline(q){const t=q.toLowerCase();
 async function ask(q){if(!q.trim())return;userSay(q);$('chatInput').value='';const key=localStorage.getItem('lo_key');
   if(!key){setTimeout(()=>botSay(offline(q)),250);return;}
   const th=document.createElement('div');th.className='msg bot';th.textContent='…';$('chatlog').appendChild(th);
-  try{const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[{role:'system',content:'You are LogiOptima, a global transportation & logistics optimization co-pilot. Use the plan context for in-scope questions and answer general questions too. '+ctxBlob()},{role:'user',content:q}]})});const j=await res.json();th.remove();botSay(j.choices?.[0]?.message?.content||('Error: '+(j.error?.message||'no response')));}
+  try{const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[{role:'system',content:'You are Zumar\'s Logic-tics Stop, a global transportation & logistics optimization co-pilot. Use the plan context for in-scope questions and answer general questions too. '+ctxBlob()},{role:'user',content:q}]})});const j=await res.json();th.remove();botSay(j.choices?.[0]?.message?.content||('Error: '+(j.error?.message||'no response')));}
   catch(e){th.remove();botSay('Request failed: '+e.message+'\n\n'+offline(q));}
 }
 
