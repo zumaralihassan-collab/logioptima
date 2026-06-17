@@ -6,12 +6,14 @@
 <title>Zumar's Logic-tics Stop — Global Transportation & Logistics Optimization</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#0a0e14; --panel:#121821; --panel2:#1a212c; --line:#283341;
     --txt:#e6edf3; --muted:#8b97a7; --accent:#3b82f6; --accent2:#22d3ee;
     --good:#34d399; --warn:#fbbf24; --bad:#f87171; --depot:#f59e0b;
-    --air:#a78bfa; --ocean:#22d3ee; --road:#fbbf24; --rail:#34d399;
+    --air:#a78bfa; --ocean:#22d3ee; --road:#fbbf24; --rail:#34d399; --purple:#a78bfa;
     --shadow:0 6px 24px rgba(0,0,0,.4); --r:12px;
   }
   *{box-sizing:border-box}
@@ -20,41 +22,58 @@
   .logo{width:34px;height:34px;border-radius:9px;background:conic-gradient(from 200deg,var(--accent),var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:800;color:#06121f}
   header h1{font-size:16px;margin:0;font-weight:700}
   header .tag{color:var(--muted);font-size:11px}
-  nav{display:flex;gap:4px;margin-left:18px;flex-wrap:wrap}
-  nav button{background:none;border:none;color:var(--muted);padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  nav{display:flex;gap:3px;margin-left:14px;flex-wrap:wrap}
+  nav button{background:none;border:none;color:var(--muted);padding:7px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer}
   nav button:hover{color:var(--txt);background:var(--panel)}
   nav button.active{color:#06121f;background:var(--accent2)}
-  .badge{margin-left:auto;font-size:11px;color:var(--accent2);border:1px solid var(--line);padding:4px 10px;border-radius:20px;background:var(--panel)}
+  .badge{margin-left:auto;font-size:11px;color:var(--accent2);border:1px solid var(--line);padding:4px 10px;border-radius:20px;background:var(--panel);white-space:nowrap}
   .layout{display:grid;grid-template-columns:1fr 340px}
   .main{padding:16px;min-height:calc(100vh - 60px)}
   .view{display:none}.view.active{display:block}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
   .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 14px;font-weight:700}
+  .card h2 .sub{text-transform:none;letter-spacing:0;color:var(--muted);font-weight:500;font-size:11px;margin-left:8px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
   label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
-  select,input[type=text],input[type=number],input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:13px}
+  select,input[type=text],input[type=number],input[type=password],input[type=date]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:13px}
   input[type=range]{width:100%;accent-color:var(--accent)}
   button.btn{cursor:pointer;border:none;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;color:#06121f;background:var(--accent)}
   button.btn:hover{filter:brightness(1.1)}
   button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   button.ghost:hover{border-color:var(--accent)}
+  button.mini{padding:5px 9px;font-size:11px;border-radius:7px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font-weight:600}
+  button.mini:hover{border-color:var(--accent)}
+  button.mini.go{background:var(--accent);color:#06121f;border:none}
   .val{color:var(--accent2);font-weight:700}
   .row{display:flex;gap:8px}.row>*{flex:1}
-  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px;position:relative;overflow:hidden}
   .kpi .k{font-size:11px;color:var(--muted)}
   .kpi .v{font-size:20px;font-weight:800;margin-top:3px}
   .kpi .v small{font-size:12px;color:var(--muted);font-weight:600}
-  .pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700}
-  /* map */
-  #worldmap{height:560px;width:100%;border-radius:10px;border:1px solid var(--line);background:#0b1220}
+  .kpi .sub2{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .kpi .spark{position:absolute;right:8px;bottom:8px;opacity:.9}
+  .kpi.rg{border-left:3px solid var(--good)}.kpi.ra{border-left:3px solid var(--warn)}.kpi.rr{border-left:3px solid var(--bad)}.kpi.rb{border-left:3px solid var(--accent)}
+  .pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block}
+  .rag-g{background:#11321f;color:var(--good)}.rag-a{background:#3a2f0e;color:var(--warn)}.rag-r{background:#3a1414;color:var(--bad)}.rag-n{background:#1d2735;color:var(--muted)}
+  .st{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .st-Delivered{background:#11321f;color:var(--good)}
+  .st-InTransit{background:#10283d;color:var(--accent2)}
+  .st-Delayed{background:#3a2f0e;color:var(--warn)}
+  .st-CustomsHold{background:#332244;color:var(--purple)}
+  .st-Exception{background:#3a1414;color:var(--bad)}
+  .st-AtOrigin{background:#1d2735;color:var(--muted)}
+  #worldmap,#crudemap,#ctmap{width:100%;border-radius:10px;border:1px solid var(--line);background:#0b1220}
+  #worldmap{height:540px}
   .leaflet-container{background:#0b1220;font-family:inherit}
   .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  .leaflet-popup-content{margin:10px 12px;font-size:12px}
   .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);margin-top:10px}
   .legend span{display:flex;align-items:center;gap:5px}
-  .dot{width:9px;height:9px;border-radius:50%}.ln{width:16px;height:3px;border-radius:2px}
-  /* location entry */
-  .seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .dot{width:9px;height:9px;border-radius:50%}.ln{width:16px;height:3px;border-radius:2px}.sq{width:9px;height:9px;border-radius:2px}
+  .seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
   .seg button{background:none;border:none;color:var(--muted);padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600}
   .seg button.active{background:var(--accent);color:#06121f}
   .ac{position:relative}
@@ -63,21 +82,22 @@
   .acitem{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
   .acitem:hover,.acitem.sel{background:var(--accent);color:#06121f}
   .acitem small{color:var(--muted)}.acitem:hover small,.acitem.sel small{color:#06121f}
-  .loclist{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:230px;overflow-y:auto}
+  .loclist{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto}
   .locrow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
   .locrow .nm{flex:1}.locrow small{color:var(--muted)}
   .locrow .role{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;cursor:pointer}
   .role.origin{background:var(--depot);color:#06121f}.role.stop{background:#2a3340;color:var(--muted)}
   .locrow .x{cursor:pointer;color:var(--muted);font-weight:700}.locrow .x:hover{color:var(--bad)}
-  .chk{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:5px 0;cursor:pointer}
+  .chk{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:7px 0;cursor:pointer}
   .chk input{width:auto;accent-color:var(--accent)}
-  /* tables / bars */
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
-  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
-  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;position:sticky;top:0;background:var(--panel);z-index:2}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:var(--panel2)}
+  tr.clk{cursor:pointer}
   .best{color:var(--good);font-weight:700}
-  .modetag{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700;color:#06121f}
+  .modetag{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700;color:#06121f;white-space:nowrap}
   details{background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
   details summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:13px;list-style:none;display:flex;align-items:center;gap:8px}
   details summary::-webkit-details-marker{display:none}
@@ -86,14 +106,45 @@
   details .body{padding:0 14px 14px;color:var(--muted);font-size:13px}
   details .body b{color:var(--txt)}
   .splitbar{display:flex;align-items:center;gap:10px;margin:9px 0}
-  .splitbar .name{width:120px;font-size:12px;color:var(--muted)}
+  .splitbar .name{width:140px;font-size:12px;color:var(--muted)}
   .splitbar .track{flex:1;background:var(--panel2);border-radius:6px;height:22px;overflow:hidden;border:1px solid var(--line)}
   .splitbar .fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;font-size:11px;font-weight:700;color:#06121f}
   .toggle{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:6px}
   .toggle button{background:none;border:none;color:var(--muted);padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600}
   .toggle button.active{background:var(--accent);color:#06121f}
   .src{font-size:10px;color:#5d6b7d;margin-top:8px}.hint{font-size:11px;color:var(--muted)}
-  /* chat */
+  .chartbox{position:relative;height:280px}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .filterbar select,.filterbar input{width:auto}
+  .conn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px}
+  .conn .nm{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+  .conn .meta{font-size:11px;color:var(--muted);margin-top:6px}
+  .grade{font-size:13px;font-weight:800;padding:2px 9px;border-radius:7px}
+  /* exception inbox */
+  .inbox{display:flex;flex-direction:column;gap:9px;max-height:560px;overflow-y:auto}
+  .exc{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:9px;padding:10px 11px}
+  .exc.sev-r{border-left-color:var(--bad)}.exc.sev-a{border-left-color:var(--warn)}.exc.sev-b{border-left-color:var(--accent2)}
+  .exc .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .exc .ttl{font-weight:700;font-size:12.5px}
+  .exc .meta{font-size:11px;color:var(--muted);margin:4px 0 8px}
+  .exc .acts{display:flex;gap:6px;flex-wrap:wrap}
+  .risktrack{position:relative;height:34px;border-radius:8px;margin:14px 0 6px;background:linear-gradient(90deg,var(--depot),#b45309);border:1px solid var(--line)}
+  .risktrack .sellzone{position:absolute;top:0;bottom:0;left:0;background:linear-gradient(90deg,#1d4ed8,#1e40af);border-radius:8px 0 0 8px;opacity:.9}
+  .risktrack .mark{position:absolute;top:-6px;width:2px;height:46px;background:#fff}
+  .risktrack .mark::after{content:attr(data-l);position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap}
+  .rtlabels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+  .matrix td{padding:7px 9px;font-size:12px}
+  .resp-S{color:var(--accent2);font-weight:700}.resp-B{color:var(--depot);font-weight:700}
+  .tl{position:relative;margin-left:8px;padding-left:18px;border-left:2px solid var(--line)}
+  .tl .step{position:relative;margin-bottom:13px}
+  .tl .step::before{content:'';position:absolute;left:-25px;top:3px;width:11px;height:11px;border-radius:50%;background:var(--accent2);border:2px solid var(--bg)}
+  .tl .step b{display:block;font-size:13px}.tl .step span{font-size:11.5px;color:var(--muted)}
+  .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:5px 9px;border-radius:20px;cursor:pointer}
+  .chip:hover{border-color:var(--accent);color:var(--txt)}
+  .chip.active{background:var(--accent);color:#06121f;border-color:var(--accent)}
+  .tag{font-size:10px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);padding:2px 7px;border-radius:6px}
+  .ibtn{cursor:pointer;color:var(--muted);font-weight:700}.ibtn:hover{color:var(--bad)}
+  .miniip{width:70px!important;padding:5px 6px!important;font-size:12px!important}
   .chat{border-left:1px solid var(--line);background:var(--panel);height:calc(100vh - 60px);position:sticky;top:60px;display:flex;flex-direction:column}
   .chathead{display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--line)}
   .chathead h2{margin:0;font-size:13px}
@@ -104,16 +155,18 @@
   .msg.bot{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:3px}
   .msg.user{background:var(--accent);color:#06121f;align-self:flex-end;border-bottom-right-radius:3px;font-weight:500}
   .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 8px}
-  .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:5px 9px;border-radius:20px;cursor:pointer}
-  .chip:hover{border-color:var(--accent);color:var(--txt)}
   .chatin{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
   .chatin input{flex:1}.chatin button{padding:9px 14px;background:var(--accent);color:#06121f;border:none;border-radius:8px;font-weight:700;cursor:pointer}
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:2000}
-  .modal.show{display:flex}.modal .card{width:440px;max-width:92vw;margin:0}
+  .modal.show{display:flex}.modal .card{width:460px;max-width:92vw;margin:0;max-height:88vh;overflow:auto}
+  .modal.wide .card{width:680px}
   .modal .close{float:right;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;pointer-events:none;z-index:3000}
   .toast.show{opacity:1}
-  @media (max-width:1100px){.layout{grid-template-columns:1fr}.chat{position:static;height:auto;border-left:none;border-top:1px solid var(--line)}.grid2,.grid4{grid-template-columns:1fr 1fr}}
+  .dl{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;font-size:13px}
+  .dl .lbl{color:var(--muted)}
+  @media (max-width:1100px){.layout{grid-template-columns:1fr}.chat{position:static;height:auto;border-left:none;border-top:1px solid var(--line)}.grid2,.grid3,.grid4{grid-template-columns:1fr 1fr}}
+  @media print{header,.chat,.filterbar,nav,.badge{display:none!important}.layout{grid-template-columns:1fr}.view{display:none!important}.view.active{display:block!important}}
 </style>
 </head>
 <body>
@@ -121,10 +174,12 @@
   <div class="logo">Z</div>
   <div><h1>Zumar's Logic-tics Stop</h1><div class="tag">Global Transportation &amp; Logistics Optimization</div></div>
   <nav>
-    <button class="active" data-view="global">🌍 World Planner</button>
-    <button data-view="optimizer">⚡ Route Sandbox</button>
-    <button data-view="exec">📊 Executive Dashboard</button>
-    <button data-view="cost">💰 Cost Optimization</button>
+    <button class="active" data-view="control">🛰️ Control Tower</button>
+    <button data-view="perf">📊 Performance</button>
+    <button data-view="cost">💸 Cost Intelligence</button>
+    <button data-view="opt">🧮 Optimization Studio</button>
+    <button data-view="global">🌍 Global &amp; Crude</button>
+    <button data-view="data">🔌 Data &amp; Reports</button>
   </nav>
   <div class="badge">AI-Assisted · Live</div>
 </header>
@@ -132,144 +187,104 @@
 <div class="layout">
 <div class="main">
 
-<!-- ===================== WORLD PLANNER ===================== -->
-<div class="view active" id="view-global">
-  <div class="grid2" style="grid-template-columns:340px 1fr">
-    <!-- controls -->
+<!-- ===================== CONTROL TOWER (HERO) ===================== -->
+<div class="view active" id="view-control">
+  <div class="grid4" id="ctKpis"></div>
+  <div class="grid2" style="grid-template-columns:1fr 340px">
     <div class="card">
-      <h2>Plan on the real world map</h2>
-      <div class="seg" id="modeSeg">
-        <button class="active" data-mode="route">Route planner</button>
-        <button data-mode="hub">Hub designer</button>
-      </div>
-
-      <label style="margin-top:12px">Add a city or address</label>
-      <div class="ac">
-        <input type="text" id="cityInput" placeholder="e.g. Singapore, Rotterdam, 221B Baker St…" autocomplete="off" />
-        <div class="aclist" id="aclist"></div>
-      </div>
-      <div class="hint" id="addHint">Type to search the built-in list; press Enter to geocode anything not found.</div>
-
-      <div id="routeOpts">
-        <label>Transport mode</label>
-        <select id="planMode">
-          <option value="road">Road / Truck</option>
-          <option value="air">Air</option>
-          <option value="ocean">Ocean</option>
-          <option value="rail">Rail</option>
-        </select>
-      </div>
-      <div id="hubOpts" style="display:none">
-        <label>Hubs to open: <span class="val" id="kHubLbl">2</span></label>
-        <input type="range" id="kHub" min="1" max="6" value="2" />
-        <div class="hint">Mark candidate hubs with the ⬤ toggle; the rest are demand cities.</div>
-      </div>
-
-      <div class="row" style="margin-top:12px">
-        <button class="btn" id="optimizeBtn" style="flex:2">⚡ Optimize</button>
-        <button class="ghost btn" id="exampleBtn" style="flex:1">Example</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="ghost btn" id="clearBtn">Clear</button>
-        <button class="ghost btn" id="customizeBtn">⚙ Insights</button>
-      </div>
-
-      <div id="customPanel" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px">
-        <div class="hint" style="margin-bottom:6px">Show in overview:</div>
-        <label class="chk"><input type="checkbox" data-kpi="distance" checked> Total distance</label>
-        <label class="chk"><input type="checkbox" data-kpi="cost" checked> Estimated cost</label>
-        <label class="chk"><input type="checkbox" data-kpi="time" checked> Transit time</label>
-        <label class="chk"><input type="checkbox" data-kpi="co2" checked> CO₂ emissions</label>
-        <label class="chk"><input type="checkbox" data-kpi="legs" checked> Stops &amp; longest leg</label>
-        <label class="chk"><input type="checkbox" data-card="centroid" checked> Center-of-gravity insight</label>
-        <label class="chk"><input type="checkbox" data-card="mode" checked> Mode recommendation</label>
-      </div>
-
-      <div class="loclist" id="loclist"></div>
-    </div>
-
-    <!-- map -->
-    <div class="card">
-      <h2 id="mapHead">Multi-city route planner</h2>
-      <div id="worldmap"></div>
+      <h2 id="ctMapHead">Live multimodal network <span class="sub">ocean · air · rail · road — click an arc or row for detail</span></h2>
+      <div id="ctmap" style="height:430px"></div>
       <div class="legend">
-        <span><span class="dot" style="background:var(--depot)"></span>Origin / hub</span>
-        <span><span class="dot" style="background:var(--accent2)"></span>Stop / demand city</span>
-        <span><span class="ln" id="legLine" style="background:var(--road)"></span>Optimized path</span>
+        <span><span class="ln" style="background:var(--ocean)"></span>Ocean</span>
+        <span><span class="ln" style="background:var(--air)"></span>Air</span>
+        <span><span class="ln" style="background:var(--rail)"></span>Rail</span>
+        <span><span class="ln" style="background:var(--road)"></span>Road</span>
+        <span><span class="dot" style="background:var(--bad)"></span>At-risk / exception</span>
       </div>
-      <div class="src" id="mapSrc">Map © OpenStreetMap · tiles © CARTO. Distances are great-circle (haversine); costs &amp; times are illustrative planning estimates.</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column">
+      <h2>⚠ Exception Inbox <span class="sub">alerts → actions</span></h2>
+      <div class="inbox" id="excInbox"></div>
     </div>
   </div>
-
   <div class="card">
-    <h2>Overview &amp; insights</h2>
-    <div class="grid4" id="planKpis"></div>
-    <div id="planInsights" style="margin-top:14px"></div>
-    <div class="hint" id="planNote" style="margin-top:6px">Add at least 2 cities, then press Optimize.</div>
+    <h2>Shipment register <span class="sub">predictive ETA &amp; disruption risk per shipment</span></h2>
+    <div class="filterbar">
+      <input type="text" id="ctSearch" placeholder="🔍 Search ID, lane, carrier, commodity, customer…" style="min-width:240px;flex:1" />
+      <select id="ctMode"><option value="">All modes</option><option>Ocean</option><option>Air</option><option>Road</option><option>Rail</option></select>
+      <select id="ctStatus"><option value="">All statuses</option><option>In Transit</option><option>Delivered</option><option>Customs Hold</option><option>Exception</option><option>Delayed</option><option>At Origin</option></select>
+      <select id="ctCarrier"><option value="">All carriers</option></select>
+      <button class="ghost btn" id="ctTemplate">⬇ Template</button>
+      <button class="ghost btn" id="ctImportBtn">⬆ Import</button>
+      <button class="btn" id="ctExport">⬇ Export Excel</button>
+      <input type="file" id="ctFile" accept=".xlsx,.xls,.csv" style="display:none" />
+    </div>
+    <div style="overflow:auto;max-height:460px;margin-top:12px">
+      <table>
+        <thead><tr><th>ID</th><th>Lane</th><th>Mode</th><th>Carrier</th><th>Commodity</th><th>ETA</th><th>Pred. ETA</th><th>Risk</th><th>Status</th><th>OTIF</th></tr></thead>
+        <tbody id="ctBody"></tbody>
+      </table>
+    </div>
+    <div class="hint" id="ctNote" style="margin-top:8px"></div>
   </div>
 </div>
 
-<!-- ===================== ROUTE SANDBOX (synthetic) ===================== -->
-<div class="view" id="view-optimizer">
+<!-- ===================== PERFORMANCE & CARRIERS ===================== -->
+<div class="view" id="view-perf">
+  <div class="card"><h2>Logistics KPI scorecard <span class="sub">live actuals vs service-level targets</span></h2>
+    <div class="kgrid" id="kpiCards"></div>
+  </div>
   <div class="grid2">
-    <div class="card">
-      <h2>Abstract scenario sandbox</h2>
-      <label>Problem type</label>
-      <select id="problem">
-        <option value="tsp">TSP — single-route ordering</option>
-        <option value="vrp">VRP — multi-vehicle delivery</option>
-        <option value="facility">Facility location</option>
-        <option value="network">Network flow — min cost</option>
-      </select>
-      <label>Points: <span class="val" id="nLbl">14</span></label>
-      <input type="range" id="n" min="5" max="40" value="14" />
-      <div id="vrpControls">
-        <label>Vehicles: <span class="val" id="vLbl">3</span></label>
-        <input type="range" id="v" min="1" max="8" value="3" />
-        <label>Capacity: <span class="val" id="capLbl">60</span>u</label>
-        <input type="range" id="cap" min="20" max="120" value="60" step="10" />
-      </div>
-      <div id="facControls" style="display:none">
-        <label>Candidate sites: <span class="val" id="fLbl">6</span></label>
-        <input type="range" id="f" min="2" max="12" value="6" />
-        <label>Open: <span class="val" id="oLbl">2</span></label>
-        <input type="range" id="o" min="1" max="6" value="2" />
-      </div>
-      <label>Strategy</label>
-      <select id="strategy"><option value="2opt">NN + 2-opt</option><option value="nn">Nearest-neighbor</option><option value="random">Random</option></select>
-      <div class="row" style="margin-top:12px"><button class="btn" id="solveBtn">⚡ Generate &amp; Solve</button></div>
-    </div>
-    <div class="card">
-      <h2>Abstract map</h2>
-      <svg id="map" viewBox="0 0 800 460" style="width:100%;border-radius:10px;background:#0b1220" preserveAspectRatio="xMidYMid meet"></svg>
-    </div>
+    <div class="card"><h2>OTIF &amp; OTD trend <span class="sub">by week</span></h2><div class="chartbox"><canvas id="chOtif"></canvas></div></div>
+    <div class="card"><h2>SLA adherence by carrier <span class="sub">actual OTD vs target</span></h2><div class="chartbox"><canvas id="chSla"></canvas></div></div>
   </div>
-  <div class="grid4" id="oKpis"></div>
-  <div class="card"><h2>Strategy comparison</h2><div id="oBars"></div><div class="hint" id="solveNote" style="margin-top:8px">Press Generate &amp; Solve.</div></div>
-</div>
-
-<!-- ===================== EXECUTIVE ===================== -->
-<div class="view" id="view-exec">
-  <div class="card">
-    <h2>U.S. freight modal split</h2>
-    <div class="toggle"><button class="active" data-split="value">By value ($)</button><button data-split="weight">By weight (tons)</button></div>
-    <div id="splitBars"></div>
-    <div class="src">Source: U.S. BTS Freight Analysis Framework / Freight Facts &amp; Figures (approx.).</div>
+  <div class="card"><h2>Carrier scorecard <span class="sub">feeds carrier sourcing &amp; procurement</span></h2>
+    <table><thead><tr><th>Carrier</th><th>Mode</th><th class="num">Shipments</th><th class="num">OTD %</th><th class="num">Tender accept</th><th class="num">Damage rate</th><th class="num">$ / mile</th><th class="num">Avg risk</th><th>Grade</th></tr></thead><tbody id="carrierBody"></tbody></table>
   </div>
-  <div class="grid4" id="execKpis"></div>
-  <div class="card"><h2>What moves how — commodity → ideal mode</h2><div id="commodityAccordion"></div></div>
   <div class="grid2">
-    <div class="card"><h2>International U.S. trade — by mode</h2><div id="intlBars"></div><div class="src">~80% of U.S. foreign-trade tonnage by water; by value water ~47%, air ~27%, truck ~18% (BTS).</div></div>
-    <div class="card"><h2>Strategic insights</h2>
-      <details open><summary>Mode choice is value-vs-weight</summary><div class="body">Trucks dominate by value and weight (~73% / ~65%). Pipeline & rail over-index on weight (cheap dense bulk). Air is the inverse — &lt;1% of weight, big share of value.</div></details>
-      <details><summary>Crude = pipeline then tanker</summary><div class="body">Pipeline ~$5/bbl vs rail $10–15 and truck $20. Internationally it shifts to marine tankers.</div></details>
-      <details><summary>Expedite trades money for time</summary><div class="body">Air ~10x ocean per kg but ~10x faster. Express adds ~1.5–2.5x. Ship only high-value/urgent by air.</div></details>
-    </div>
+    <div class="card"><h2>Sustainability — CO₂ by mode</h2><div class="chartbox"><canvas id="chCo2"></canvas></div></div>
+    <div class="card"><h2>Modal-shift recommender <span class="sub">cut CO₂ &amp; cost without breaking SLA</span></h2><div id="modalShift"></div><div class="src">Shift candidates: non-urgent lanes with slack vs SLA where a lower-carbon mode still arrives on time.</div></div>
+  </div>
+  <div class="card"><h2>SLA adherence detail — by carrier</h2>
+    <table><thead><tr><th>Carrier</th><th class="num">Shipments</th><th class="num">On-time</th><th class="num">OTD %</th><th class="num">Target</th><th class="num">Variance</th><th>Status</th></tr></thead><tbody id="slaBody"></tbody></table>
   </div>
 </div>
 
-<!-- ===================== COST ===================== -->
+<!-- ===================== COST INTELLIGENCE ===================== -->
 <div class="view" id="view-cost">
+  <div class="grid4" id="costKpis"></div>
+  <div class="card">
+    <h2>💡 Should-Move Cost™ <span class="sub">model-based should-cost for a lane, then audit the invoice</span></h2>
+    <div class="grid4">
+      <div><label>Origin → Destination</label><select id="smcLane"></select></div>
+      <div><label>Mode</label><select id="smcMode"><option>Ocean</option><option>Air</option><option>Road</option><option>Rail</option></select></div>
+      <div><label>Weight (kg)</label><input type="number" id="smcWeight" value="18000" /></div>
+      <div><label>Invoiced freight ($)</label><input type="number" id="smcInvoiced" value="" placeholder="optional — to audit" /></div>
+    </div>
+    <div class="grid4">
+      <div><label>Fuel surcharge (%)</label><input type="number" id="smcFuel" value="18" /></div>
+      <div><label>Accessorials ($)</label><input type="number" id="smcAcc" value="350" /></div>
+      <div><label>Drayage ($)</label><input type="number" id="smcDray" value="600" /></div>
+      <div style="display:flex;align-items:flex-end"><button class="btn" id="smcRun" style="width:100%">Compute should-cost</button></div>
+    </div>
+    <div id="smcResult" style="margin-top:14px"></div>
+  </div>
+  <div class="card">
+    <h2>Invoice audit — overpriced lanes <span class="sub">invoiced vs should-cost across the network</span></h2>
+    <table><thead><tr><th>Lane</th><th>Mode</th><th class="num">Should-cost</th><th class="num">Invoiced</th><th class="num">Variance</th><th class="num">%</th><th>Flag</th></tr></thead><tbody id="smcBody"></tbody></table>
+    <div class="src">Variance &gt; +8% over should-cost is flagged for audit. Should-cost = lane distance × mode base rate × weight factor + fuel + accessorials + drayage.</div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>🚨 Detention &amp; Demurrage leak tracker</h2><div class="grid2" id="dndKpis"></div>
+      <table style="margin-top:10px"><thead><tr><th>Shipment</th><th>Port</th><th class="num">Free days</th><th class="num">Days used</th><th class="num">D&amp;D cost</th><th>Status</th></tr></thead><tbody id="dndBody"></tbody></table>
+      <div class="src">Detention = carrier equipment held at your site; demurrage = container dwell at port beyond free time. Often a silent 1–3% freight-spend leak.</div>
+    </div>
+    <div class="card"><h2>Cost-to-Serve <span class="sub">where am I quietly losing money?</span></h2>
+      <div class="toggle" id="ctsToggle"><button class="active" data-dim="customer">By customer</button><button data-dim="lane">By lane</button><button data-dim="commodity">By commodity</button></div>
+      <div class="chartbox" style="height:230px"><canvas id="chCts"></canvas></div>
+      <table style="margin-top:8px"><thead><tr><th id="ctsDimHead">Customer</th><th class="num">Revenue</th><th class="num">Logistics cost</th><th class="num">Margin</th><th class="num">Margin %</th></tr></thead><tbody id="ctsBody"></tbody></table>
+    </div>
+  </div>
   <div class="card">
     <h2>Multi-modal cost &amp; time comparator</h2>
     <div class="grid4">
@@ -284,44 +299,326 @@
     </div>
     <div id="costResult" style="margin-top:14px"></div>
   </div>
+  <div class="card">
+    <h2>🌐 Landed cost, tariffs &amp; Incoterms® 2020</h2>
+    <div class="grid4">
+      <div><label>Commodity</label><select id="lcCommodity"></select></div>
+      <div><label>Goods value (FOB, $)</label><input type="number" id="lcValue" value="50000" /></div>
+      <div><label>Incoterm</label><select id="lcInco"></select></div>
+      <div><label>Freight ($)</label><input type="number" id="lcFreight" value="4200" /></div>
+    </div>
+    <div class="grid4">
+      <div><label>Insurance ($)</label><input type="number" id="lcIns" value="350" /></div>
+      <div><label>Duty rate override (%)</label><input type="number" id="lcDuty" value="" placeholder="auto from HS" /></div>
+      <div><label>VAT / GST (%)</label><input type="number" id="lcVat" value="0" /></div>
+      <div><label>Brokerage &amp; fees ($)</label><input type="number" id="lcFees" value="450" /></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="lcRun" style="flex:0 0 auto;padding:9px 22px">Calculate landed cost</button></div>
+    <div id="landedResult" style="margin-top:14px"></div>
+    <div id="incoBox" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- ===================== OPTIMIZATION STUDIO ===================== -->
+<div class="view" id="view-opt">
+  <div class="card" style="margin-bottom:12px">
+    <div class="seg" id="optSeg">
+      <button class="active" data-sub="solver">🧮 Constraint Solver</button>
+      <button data-sub="routing">🗺️ Routing &amp; Network</button>
+    </div>
+    <span class="hint" style="margin-left:10px">An interactive, visual alternative to Excel Solver — define variables &amp; constraints, solve, read the sensitivity report, and export.</span>
+  </div>
+
+  <!-- SUB: SOLVER -->
+  <div id="opt-solver">
+    <div class="card">
+      <h2>Model builder <span class="sub">linear program — add variables &amp; constraints, just like Solver</span></h2>
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:2"><label>Start from a template</label><select id="optTemplate"></select></div>
+        <div><label>Objective</label><select id="objSense"><option value="max">Maximize</option><option value="min">Minimize</option></select></div>
+        <div style="flex:0 0 auto"><button class="btn" id="optSolve" style="padding:9px 22px">⚡ Solve</button></div>
+      </div>
+      <div id="optDesc" class="hint" style="margin:10px 0"></div>
+      <h2 style="margin-top:6px">Decision variables</h2>
+      <div style="overflow:auto"><table><thead><tr><th>Variable</th><th>Description</th><th class="num">Obj. coeff.</th><th class="num">Lower</th><th class="num">Upper</th><th></th></tr></thead><tbody id="varBody"></tbody></table></div>
+      <button class="mini" id="addVar" style="margin-top:8px">+ Add variable</button>
+      <h2 style="margin-top:16px">Constraints</h2>
+      <div style="overflow:auto"><table><thead><tr><th>Name</th><th>Coefficients (per variable)</th><th>Sense</th><th class="num">RHS</th><th></th></tr></thead><tbody id="conBody"></tbody></table></div>
+      <button class="mini" id="addCon" style="margin-top:8px">+ Add constraint</button>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>Solution <span class="sub">optimal decision</span></h2><div id="optResult"></div></div>
+      <div class="card"><h2>Solution chart</h2><div class="chartbox"><canvas id="chOpt"></canvas></div></div>
+    </div>
+    <div class="card">
+      <h2>📑 Sensitivity analysis <span class="sub">shadow prices, reduced costs &amp; ranging — like Excel's report</span></h2>
+      <div id="optSens"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="optExport" style="flex:0 0 auto;padding:9px 18px">⬇ Export to Excel (Answer + Sensitivity)</button>
+        <button class="ghost btn" id="optInterpret" style="flex:0 0 auto;padding:9px 18px">🤖 AI: interpret &amp; recommend</button>
+        <span style="flex:1"></span>
+      </div>
+      <div id="optAI" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- SUB: ROUTING -->
+  <div id="opt-routing" style="display:none">
+    <div class="grid2">
+      <div class="card">
+        <h2>Routing &amp; network solver <span class="sub">TSP · VRP · facility · min-cost flow · re-routing</span></h2>
+        <label>Problem type</label>
+        <select id="problem">
+          <option value="tsp">TSP — single-route ordering</option>
+          <option value="vrp">VRP — multi-vehicle delivery</option>
+          <option value="facility">Facility location</option>
+          <option value="network">Network flow — min cost</option>
+          <option value="reroute">Re-routing — disruption recovery</option>
+        </select>
+        <label>Points: <span class="val" id="nLbl">14</span></label>
+        <input type="range" id="n" min="5" max="40" value="14" />
+        <div id="vrpControls">
+          <label>Vehicles: <span class="val" id="vLbl">3</span></label>
+          <input type="range" id="v" min="1" max="8" value="3" />
+          <label>Capacity: <span class="val" id="capLbl">60</span>u</label>
+          <input type="range" id="cap" min="20" max="120" value="60" step="10" />
+        </div>
+        <div id="facControls" style="display:none">
+          <label>Candidate sites: <span class="val" id="fLbl">6</span></label>
+          <input type="range" id="f" min="2" max="12" value="6" />
+          <label>Open: <span class="val" id="oLbl">2</span></label>
+          <input type="range" id="o" min="1" max="6" value="2" />
+        </div>
+        <div id="rrControls" style="display:none">
+          <label>Blocked nodes: <span class="val" id="bLbl">2</span> <span class="hint">(simulate a closure / disruption)</span></label>
+          <input type="range" id="b" min="0" max="6" value="2" />
+        </div>
+        <label>Strategy</label>
+        <select id="strategy"><option value="2opt">NN + 2-opt</option><option value="nn">Nearest-neighbor</option><option value="random">Random</option></select>
+        <div class="row" style="margin-top:12px"><button class="btn" id="solveBtn">⚡ Generate &amp; Solve</button></div>
+      </div>
+      <div class="card">
+        <h2 id="rlHead">Network map</h2>
+        <svg id="map" viewBox="0 0 800 460" style="width:100%;border-radius:10px;background:#0b1220" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+    <div class="grid4" id="oKpis"></div>
+    <div class="card"><h2>Strategy comparison</h2><div id="oBars"></div><div class="hint" id="solveNote" style="margin-top:8px">Press Generate &amp; Solve.</div></div>
+  </div>
+</div>
+
+<!-- ===================== GLOBAL & CRUDE ===================== -->
+<div class="view" id="view-global">
+  <div class="card" style="margin-bottom:12px">
+    <div class="seg" id="globalSeg">
+      <button class="active" data-sub="planner">🌍 World route &amp; hub planner</button>
+      <button data-sub="crude">🛢️ Global crude shipping network</button>
+    </div>
+  </div>
+
+  <!-- SUB: PLANNER -->
+  <div id="global-planner">
+    <div class="grid2" style="grid-template-columns:340px 1fr">
+      <div class="card">
+        <h2>Plan on the real world map</h2>
+        <div class="seg" id="modeSeg">
+          <button class="active" data-mode="route">Route planner</button>
+          <button data-mode="hub">Hub designer</button>
+        </div>
+        <label style="margin-top:12px">Add a city or address</label>
+        <div class="ac">
+          <input type="text" id="cityInput" placeholder="e.g. Singapore, Rotterdam, 221B Baker St…" autocomplete="off" />
+          <div class="aclist" id="aclist"></div>
+        </div>
+        <div class="hint" id="addHint">Type to search the built-in list; press Enter to geocode anything not found.</div>
+        <div id="routeOpts">
+          <label>Transport mode</label>
+          <select id="planMode"><option value="road">Road / Truck</option><option value="air">Air</option><option value="ocean">Ocean</option><option value="rail">Rail</option></select>
+        </div>
+        <div id="hubOpts" style="display:none">
+          <label>Hubs to open: <span class="val" id="kHubLbl">2</span></label>
+          <input type="range" id="kHub" min="1" max="6" value="2" />
+          <div class="hint">Mark candidate hubs with the toggle; the rest are demand cities.</div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="optimizeBtn" style="flex:2">⚡ Optimize</button>
+          <button class="ghost btn" id="exampleBtn" style="flex:1">Example</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="ghost btn" id="clearBtn">Clear</button>
+          <button class="ghost btn" id="customizeBtn">⚙ Insights</button>
+        </div>
+        <div id="customPanel" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px">
+          <div class="hint" style="margin-bottom:6px">Show in overview:</div>
+          <label class="chk"><input type="checkbox" data-kpi="distance" checked> Total distance</label>
+          <label class="chk"><input type="checkbox" data-kpi="cost" checked> Estimated cost</label>
+          <label class="chk"><input type="checkbox" data-kpi="time" checked> Transit time</label>
+          <label class="chk"><input type="checkbox" data-kpi="co2" checked> CO₂ emissions</label>
+          <label class="chk"><input type="checkbox" data-kpi="legs" checked> Stops &amp; longest leg</label>
+          <label class="chk"><input type="checkbox" data-card="centroid" checked> Center-of-gravity insight</label>
+          <label class="chk"><input type="checkbox" data-card="mode" checked> Mode recommendation</label>
+        </div>
+        <div class="loclist" id="loclist"></div>
+      </div>
+      <div class="card">
+        <h2 id="mapHead">Multi-city route planner</h2>
+        <div id="worldmap"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--depot)"></span>Origin / hub</span>
+          <span><span class="dot" style="background:var(--accent2)"></span>Stop / demand city</span>
+          <span><span class="ln" id="legLine" style="background:var(--road)"></span>Optimized path</span>
+        </div>
+        <div class="src" id="mapSrc">Map © OpenStreetMap · tiles © CARTO. Distances are great-circle (haversine); costs &amp; times are illustrative planning estimates.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Overview &amp; insights</h2>
+      <div class="grid4" id="planKpis"></div>
+      <div id="planInsights" style="margin-top:14px"></div>
+      <div class="hint" id="planNote" style="margin-top:6px">Add at least 2 cities, then press Optimize.</div>
+    </div>
+  </div>
+
+  <!-- SUB: CRUDE -->
+  <div id="global-crude" style="display:none">
+    <div class="grid2" style="grid-template-columns:350px 1fr">
+      <div class="card">
+        <h2>Crude voyage optimizer</h2>
+        <label>Crude lane</label><select id="crLane"></select>
+        <label>Tanker class</label><select id="crClass"></select>
+        <label class="chk"><input type="checkbox" id="crGrat" checked> Longitude / latitude graticule</label>
+        <label class="chk"><input type="checkbox" id="crChoke" checked> Show transit chokepoints</label>
+        <label class="chk"><input type="checkbox" id="crReroute"> Reroute via Cape of Good Hope (avoid Suez / Bab-el-Mandeb)</label>
+        <div class="row" style="margin-top:12px"><button class="btn" id="crGo">⚓ Optimize voyage</button><button class="ghost btn" id="crAll" style="flex:.7">All lanes</button></div>
+        <div class="grid2" id="crKpis" style="margin-top:14px"></div>
+        <div id="crInsight" style="margin-top:10px"></div>
+      </div>
+      <div class="card"><h2 id="crHead">Global crude tanker network</h2><div id="crudemap" style="height:560px"></div>
+        <div class="legend">
+          <span><span class="sq" style="background:var(--depot)"></span>Export terminal</span>
+          <span><span class="sq" style="background:var(--good)"></span>Refining / import hub</span>
+          <span><span class="dot" style="background:var(--bad)"></span>Chokepoint</span>
+          <span><span class="ln" style="background:var(--accent2)"></span>Voyage</span>
+        </div>
+        <div class="src">Chokepoint volumes: U.S. EIA <i>World Oil Transit Chokepoints</i> (2023–2024). Tanker capacities &amp; Worldscale-style freight are illustrative planning estimates.</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>World oil transit chokepoints</h2><table><thead><tr><th>Chokepoint</th><th class="num">2023 Mb/d</th><th class="num">2024 Mb/d</th><th>Risk</th><th>Note</th></tr></thead><tbody id="chokeBody"></tbody></table></div>
+      <div class="card"><h2>Tanker classes &amp; economics</h2><table><thead><tr><th>Class</th><th class="num">DWT</th><th class="num">~Cargo (bbl)</th><th>Typical use</th></tr></thead><tbody id="tankerBody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DATA & REPORTS ===================== -->
+<div class="view" id="view-data">
+  <div class="card"><h2>Data sources &amp; ERP connectors <span class="sub">import history for lead-time analytics</span></h2>
+    <div class="grid4" id="connCards"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="ghost btn" id="erpImportBtn" style="flex:0 0 auto;padding:9px 16px">⬆ Import lead-time history (Excel/CSV)</button>
+      <button class="ghost btn" id="erpTemplate" style="flex:0 0 auto;padding:9px 16px">⬇ Template</button>
+      <input type="file" id="erpFile" accept=".xlsx,.xls,.csv" style="display:none" />
+      <span style="flex:1"></span>
+    </div>
+    <div class="hint" id="erpNote" style="margin-top:8px">Demo connectors are illustrative. Import your own lead-time export to drive the analytics below.</div>
+  </div>
   <div class="grid2">
-    <div class="card"><h2>Import / export / freight-forwarding cost stack</h2><div id="ffStack"></div><div class="src">Illustrative door-to-door decomposition; varies by lane &amp; Incoterms.</div></div>
-    <div class="card"><h2>Carrier-mode rate reference</h2><table><thead><tr><th>Mode</th><th class="num">$/kg/1000km</th><th class="num">Speed</th><th>Best for</th></tr></thead><tbody id="modeRef"></tbody></table><div class="src">Illustrative planning rates, not quotes.</div></div>
+    <div class="card"><h2>Lead-time history &amp; variability</h2><div class="chartbox" style="height:240px"><canvas id="chLeadHist"></canvas></div><div class="grid4" id="leadStats" style="margin-top:12px"></div></div>
+    <div class="card"><h2>Supplier / lane scorecards</h2><div style="overflow:auto;max-height:360px"><table><thead><tr><th>Supplier / lane</th><th class="num">Orders</th><th class="num">Avg LT</th><th class="num">σ</th><th class="num">OTIF %</th><th>Grade</th></tr></thead><tbody id="supplierBody"></tbody></table></div></div>
+  </div>
+  <div class="card">
+    <h2>Inventory planning insight <span class="sub">from lead-time history</span></h2>
+    <div class="grid4">
+      <div><label>Avg daily demand (units)</label><input type="number" id="ivDemand" value="120" /></div>
+      <div><label>Service level</label><select id="ivService"><option value="1.28">90%</option><option value="1.65" selected>95%</option><option value="2.05">98%</option><option value="2.33">99%</option></select></div>
+      <div><label>Avg lead time (days)</label><input type="number" id="ivLt" value="32" /></div>
+      <div><label>Lead-time σ (days)</label><input type="number" id="ivSd" value="6" /></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="ivRun" style="flex:0 0 auto;padding:9px 22px">Compute safety stock &amp; reorder point</button></div>
+    <div id="invResult" style="margin-top:14px"></div>
+  </div>
+  <div class="card">
+    <h2>Ad-hoc report builder <span class="sub">pivot any dataset → table + chart → export</span></h2>
+    <div class="grid4">
+      <div><label>Dataset</label><select id="rpDataset"><option value="shipments">Shipments</option><option value="leadtime">Lead-time history</option></select></div>
+      <div><label>Group by</label><select id="rpDim"></select></div>
+      <div><label>Measure</label><select id="rpMeasure"></select></div>
+      <div><label>Filter</label><select id="rpFilter"></select></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="rpRun" style="flex:1.4">⚙ Generate report</button>
+      <button class="ghost btn" id="rpExport">⬇ Excel</button>
+      <button class="ghost btn" id="rpCsv">⬇ CSV</button>
+      <button class="ghost btn" id="rpPrint">🖨 Print</button>
+    </div>
+    <div class="hint" style="margin-top:8px">Presets:
+      <span class="chip" data-preset="otd">OTD % by carrier</span>
+      <span class="chip" data-preset="spendmode">Spend by mode</span>
+      <span class="chip" data-preset="lane">Volume by lane</span>
+      <span class="chip" data-preset="leadcom">Avg lead time by commodity</span>
+      <span class="chip" data-preset="cts">Margin by customer</span>
+    </div>
+    <div class="grid2" style="margin-top:14px">
+      <div><h2 id="rpTitle">Report</h2><div style="overflow:auto;max-height:380px"><table><thead id="rpHead"></thead><tbody id="rpBody"></tbody></table></div></div>
+      <div><h2>Visualization</h2><div class="chartbox" style="height:360px"><canvas id="chReport"></canvas></div></div>
+    </div>
   </div>
 </div>
 
 </div><!-- /main -->
 
-<!-- AI CHAT -->
+<!-- AI COPILOT -->
 <div class="chat" id="chatPanel">
-  <div class="chathead"><h2>AI Assistant</h2><span class="live" id="liveBadge">offline</span><button class="gear" id="gear" title="API settings">⚙</button></div>
-  <div id="chatlog"><div class="msg bot">Hi Zumar 👋 I'm your logistics co-pilot. Add real cities on the World Planner and ask me to explain the route, compare modes, or anything else. Add your API key (⚙) for full real-time AI.</div></div>
+  <div class="chathead"><h2>AI Copilot</h2><span class="live" id="liveBadge">offline</span><button class="gear" id="gear" title="API settings">⚙</button></div>
+  <div id="chatlog"><div class="msg bot">Hi Zumar 👋 I'm your logistics copilot across the whole suite — Control Tower, performance &amp; carriers, cost intelligence, the solver, crude shipping, ERP lead times. Ask me things like "which lanes bled money?", "explain this shipment's risk", or "interpret the sensitivity report". Add your API key (⚙) for full real-time AI.</div></div>
   <div class="chips" id="chips">
-    <div class="chip" data-q="Explain my current route and how to improve it">Explain my route</div>
-    <div class="chip" data-q="Which mode is best for shipping electronics overseas?">Best mode?</div>
-    <div class="chip" data-q="What share of US freight moves by truck?">US truck share?</div>
+    <div class="chip" data-q="Summarize my operations — OTIF, exceptions, and biggest risks right now">Ops summary</div>
+    <div class="chip" data-q="Which lanes bled money last quarter and why?">Which lanes bled money?</div>
+    <div class="chip" data-q="Which carrier is breaching SLA the most and what should I do?">SLA breaches</div>
+    <div class="chip" data-q="What happens to crude routing if the Strait of Hormuz closes?">Hormuz risk</div>
   </div>
   <div class="chatin"><input type="text" id="chatInput" placeholder="Ask anything…" /><button id="sendBtn">Send</button></div>
 </div>
 </div>
 
+<!-- MODALS -->
 <div class="modal" id="modal"><div class="card">
   <button class="close" id="closeModal">✕</button>
-  <h2>Chatbot API settings (real-time AI)</h2>
+  <h2>Copilot API settings (real-time AI)</h2>
   <label>Endpoint (OpenAI-compatible)</label><input type="text" id="apiUrl" value="https://api.openai.com/v1/chat/completions" />
   <label>Model</label><input type="text" id="apiModel" value="gpt-4o-mini" />
   <label>API key — stored locally in your browser only</label><input type="password" id="apiKey" placeholder="sk-..." />
   <div class="hint" style="margin-top:6px">OpenAI, Azure, OpenRouter, or any compatible gateway. Blank = offline assistant.</div>
   <div class="row" style="margin-top:12px"><button class="btn" id="saveKey">Save</button></div>
 </div></div>
+
+<div class="modal" id="ctModal"><div class="card">
+  <button class="close" id="ctClose">✕</button>
+  <div id="ctDetail"></div>
+</div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
+/* =========================================================================
+   ZUMAR'S LOGIC-TICS STOP — core engine
+   ========================================================================= */
 const $=id=>document.getElementById(id);
 const rnd=(a,b)=>a+Math.random()*(b-a);
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2300);}
+const fmt=n=>Math.round(n).toLocaleString();
+const f$=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString();
+const f1=n=>(Math.round(n*10)/10).toLocaleString();
+const pct=n=>(Math.round(n*10)/10)+'%';
+const esc=s=>(''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-/* ===================== CITY DATA ===================== */
+/* seeded RNG → reproducible synthetic data */
+let _seed=987654321;
+function sr(){_seed=(_seed*1664525+1013904223)&0x7fffffff;return _seed/0x7fffffff;}
+const sint=(a,b)=>Math.floor(a+sr()*(b-a+1));
+const spick=a=>a[Math.floor(sr()*a.length)];
+
+/* ---- cities ---- */
 const CITIES=[
 ["New York","USA",40.71,-74.01],["Los Angeles","USA",34.05,-118.24],["Chicago","USA",41.88,-87.63],["Houston","USA",29.76,-95.37],["Miami","USA",25.76,-80.19],["Atlanta","USA",33.75,-84.39],["Seattle","USA",47.61,-122.33],["Dallas","USA",32.78,-96.80],["Denver","USA",39.74,-104.99],["San Francisco","USA",37.77,-122.42],["Boston","USA",42.36,-71.06],["Washington DC","USA",38.91,-77.04],["Phoenix","USA",33.45,-112.07],["Toronto","Canada",43.65,-79.38],["Vancouver","Canada",49.28,-123.12],["Montreal","Canada",45.50,-73.57],["Mexico City","Mexico",19.43,-99.13],["Monterrey","Mexico",25.69,-100.32],["Guadalajara","Mexico",20.67,-103.35],["Panama City","Panama",8.98,-79.52],
 ["Sao Paulo","Brazil",-23.55,-46.63],["Rio de Janeiro","Brazil",-22.91,-43.17],["Santos","Brazil",-23.96,-46.33],["Buenos Aires","Argentina",-34.60,-58.38],["Lima","Peru",-12.05,-77.04],["Bogota","Colombia",4.71,-74.07],["Santiago","Chile",-33.45,-70.67],["Caracas","Venezuela",10.48,-66.90],["Montevideo","Uruguay",-34.90,-56.16],
@@ -330,317 +627,791 @@ const CITIES=[
 ["Singapore","Singapore",1.35,103.82],["Hong Kong","China",22.32,114.17],["Shanghai","China",31.23,121.47],["Beijing","China",39.90,116.41],["Shenzhen","China",22.54,114.06],["Guangzhou","China",23.13,113.26],["Ningbo","China",29.87,121.54],["Tokyo","Japan",35.68,139.69],["Osaka","Japan",34.69,135.50],["Yokohama","Japan",35.44,139.64],["Seoul","South Korea",37.57,126.98],["Busan","South Korea",35.18,129.08],["Mumbai","India",19.08,72.88],["Delhi","India",28.61,77.21],["Bengaluru","India",12.97,77.59],["Chennai","India",13.08,80.27],["Kolkata","India",22.57,88.36],["Bangkok","Thailand",13.76,100.50],["Jakarta","Indonesia",-6.21,106.85],["Manila","Philippines",14.60,120.98],["Kuala Lumpur","Malaysia",3.14,101.69],["Ho Chi Minh City","Vietnam",10.82,106.63],["Hanoi","Vietnam",21.03,105.85],["Taipei","Taiwan",25.03,121.57],["Karachi","Pakistan",24.86,67.01],["Lahore","Pakistan",31.55,74.34],["Dhaka","Bangladesh",23.81,90.41],["Colombo","Sri Lanka",6.93,79.86],["Tashkent","Uzbekistan",41.30,69.24],
 ["Sydney","Australia",-33.87,151.21],["Melbourne","Australia",-37.81,144.96],["Brisbane","Australia",-27.47,153.03],["Perth","Australia",-31.95,115.86],["Auckland","New Zealand",-36.85,174.76]
 ];
-const EXAMPLE_ROUTE=["Houston","Rotterdam","Singapore","Ningbo","Yokohama"];
-const EXAMPLE_HUBS=["Los Angeles","Chicago","New York","Dallas","Atlanta","Miami","Seattle","Denver"];
+const COORD={};CITIES.forEach(c=>COORD[c[0]]={name:c[0],country:c[1],lat:c[2],lon:c[3]});
+function haversine(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+const KM_MI=0.621371;
 
-/* mode params: rate $/km (per shipment, illustrative), speed km/h, co2 g/ton-km, color */
-const PLANMODES={
-  road:{rate:1.8,speed:65,co2:62,color:'#fbbf24',label:'Road / Truck'},
-  air:{rate:6.5,speed:800,co2:500,color:'#a78bfa',label:'Air'},
-  ocean:{rate:0.5,speed:35,co2:10,color:'#22d3ee',label:'Ocean'},
-  rail:{rate:0.9,speed:60,co2:22,color:'#34d399',label:'Rail'}
-};
-
-/* ===================== MAP STATE ===================== */
-let map, layerGroup, locations=[], planMode='route';
-const KPIVIS={distance:true,cost:true,time:true,co2:true,legs:true};
-const CARDVIS={centroid:true,mode:true};
-
-function initMap(){
-  map=L.map('worldmap',{worldCopyJump:true,minZoom:2}).setView([25,15],2);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
-  layerGroup=L.layerGroup().addTo(map);
-}
-function haversine(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,
-  la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;
-  const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(h));}
-
-/* autocomplete */
-let acSel=-1, acMatches=[];
-function searchCities(q){q=q.toLowerCase().trim();if(!q)return[];
-  return CITIES.filter(c=>c[0].toLowerCase().includes(q)||c[1].toLowerCase().includes(q)).slice(0,8);}
-function renderAC(q){
-  acMatches=searchCities(q);acSel=-1;const box=$('aclist');
-  if(!acMatches.length){box.classList.remove('show');box.innerHTML='';return;}
-  box.innerHTML=acMatches.map((c,i)=>`<div class="acitem" data-i="${i}">${c[0]} <small>${c[1]}</small></div>`).join('');
-  box.classList.add('show');
-  box.querySelectorAll('.acitem').forEach(el=>el.onclick=()=>addLocation({name:acMatches[+el.dataset.i][0],country:acMatches[+el.dataset.i][1],lat:acMatches[+el.dataset.i][2],lon:acMatches[+el.dataset.i][3]}));
-}
-async function geocode(q){
-  try{
-    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
-    const j=await r.json();
-    if(j&&j.length){return {name:q,country:(j[0].display_name||'').split(',').slice(-1)[0].trim(),lat:+j[0].lat,lon:+j[0].lon};}
-  }catch(e){}
-  return null;
-}
-function addLocation(loc){
-  if(locations.find(l=>Math.abs(l.lat-loc.lat)<0.01&&Math.abs(l.lon-loc.lon)<0.01)){toast(loc.name+' already added.');return;}
-  loc.role=locations.length===0?'origin':'stop';
-  locations.push(loc);
-  $('cityInput').value='';$('aclist').classList.remove('show');
-  renderLocList();drawMarkers();
-  if(map)map.panTo([loc.lat,loc.lon]);
-}
-function renderLocList(){
-  $('loclist').innerHTML=locations.map((l,i)=>`<div class="locrow">
-    <span class="role ${l.role}" data-i="${i}" title="Toggle origin/hub">${l.role==='origin'?'ORIGIN':'STOP'}</span>
-    <span class="nm">${l.name} <small>${l.country||''}</small></span>
-    <span class="x" data-x="${i}">✕</span></div>`).join('');
-  $('loclist').querySelectorAll('.role').forEach(el=>el.onclick=()=>{const i=+el.dataset.i;
-    if(planMode==='route'){locations.forEach((l,j)=>l.role=j===i?'origin':'stop');}
-    else{locations[i].role=locations[i].role==='origin'?'stop':'origin';}
-    renderLocList();drawMarkers();});
-  $('loclist').querySelectorAll('.x').forEach(el=>el.onclick=()=>{locations.splice(+el.dataset.x,1);if(planMode==='route'&&locations.length&&!locations.find(l=>l.role==='origin'))locations[0].role='origin';renderLocList();drawMarkers();});
-}
-function drawMarkers(routeOrder,assign,chosen){
-  if(!layerGroup)return;layerGroup.clearLayers();
-  locations.forEach(l=>{
-    const origin=l.role==='origin';
-    L.circleMarker([l.lat,l.lon],{radius:origin?8:5,color:'#08111c',weight:2,
-      fillColor:origin?'#f59e0b':'#22d3ee',fillOpacity:1}).addTo(layerGroup)
-      .bindPopup(`<b>${l.name}</b><br>${l.country||''}<br>${l.lat.toFixed(2)}, ${l.lon.toFixed(2)}`);
-  });
-  if(routeOrder){const col=PLANMODES[$('planMode').value].color;
-    const pts=routeOrder.map(i=>[locations[i].lat,locations[i].lon]);
-    L.polyline(pts,{color:col,weight:3,opacity:.9}).addTo(layerGroup);
-  }
-  if(assign){assign.forEach(a=>L.polyline([[a.city.lat,a.city.lon],[a.hub.lat,a.hub.lon]],{color:'#3b82f6',weight:1.6,opacity:.6}).addTo(layerGroup));}
-  if(locations.length){try{map.fitBounds(L.latLngBounds(locations.map(l=>[l.lat,l.lon])).pad(0.25));}catch(e){}}
-}
-
-/* TSP on haversine */
-function tspOrder(){
-  const origin=locations.findIndex(l=>l.role==='origin');const start=origin<0?0:origin;
-  const n=locations.length,seen=Array(n).fill(false),o=[start];seen[start]=true;
-  for(let k=1;k<n;k++){let last=o[o.length-1],b=-1,bd=1e18;for(let j=0;j<n;j++)if(!seen[j]){const d=haversine(locations[last],locations[j]);if(d<bd){bd=d;b=j;}}o.push(b);seen[b]=true;}
-  o.push(start);
-  let imp=true;while(imp){imp=false;for(let i=1;i<o.length-2;i++)for(let k=i+1;k<o.length-1;k++){
-    const A=locations[o[i-1]],B=locations[o[i]],C=locations[o[k]],D=locations[o[k+1]];
-    if(haversine(A,B)+haversine(C,D)>haversine(A,C)+haversine(B,D)+1e-9){o.splice(i,k+1-i,...o.slice(i,k+1).reverse());imp=true;}}}
-  return o;
-}
-function routeKm(o){let d=0;for(let i=0;i<o.length-1;i++)d+=haversine(locations[o[i]],locations[o[i+1]]);return d;}
-
-/* Facility location (greedy p-median) */
-function hubSolve(k){
-  const cands=locations.map((l,i)=>i).filter(i=>locations[i].role==='origin');
-  const pool=cands.length?cands:locations.map((l,i)=>i);
-  const chosen=[];let avail=pool.slice();
-  while(chosen.length<Math.min(k,avail.length)){
-    let best=-1,bc=1e18;
-    for(const c of avail){if(chosen.includes(c))continue;const test=[...chosen,c];let cost=0;
-      for(const d of locations){let m=1e18;for(const s of test)m=Math.min(m,haversine(d,locations[s]));cost+=m;}
-      if(cost<bc){bc=cost;best=c;}}
-    chosen.push(best);
-  }
-  const assign=locations.map(d=>{let m=1e18,w=chosen[0];for(const s of chosen){const x=haversine(d,locations[s]);if(x<m){m=x;w=s;}}return{city:d,hub:locations[w],dist:m};});
-  const total=assign.reduce((a,x)=>a+x.dist,0);
-  return {chosen,assign,total};
-}
-
-/* centroid (center of gravity) */
-function centroid(){let x=0,y=0,z=0;locations.forEach(l=>{const la=l.lat*Math.PI/180,lo=l.lon*Math.PI/180;x+=Math.cos(la)*Math.cos(lo);y+=Math.cos(la)*Math.sin(lo);z+=Math.sin(la);});
-  const n=locations.length;x/=n;y/=n;z/=n;const lon=Math.atan2(y,x),hyp=Math.sqrt(x*x+y*y),lat=Math.atan2(z,hyp);
-  const c={lat:lat*180/Math.PI,lon:lon*180/Math.PI};
-  let best=null,bd=1e18;CITIES.forEach(ci=>{const d=haversine(c,{lat:ci[2],lon:ci[3]});if(d<bd){bd=d;best=ci;}});
-  return {c,nearest:best};
-}
-
-let PLAN={};
-function optimize(){
-  if(locations.length<2){toast('Add at least 2 cities.');return;}
-  if(planMode==='route'){
-    const o=tspOrder();const km=routeKm(o);const m=PLANMODES[$('planMode').value];
-    const cost=km*m.rate, hours=km/m.speed, co2=km*m.co2/1000; // kg CO2 assuming ~1 ton
-    drawMarkers(o);
-    // longest leg
-    let maxLeg=0,maxPair='';for(let i=0;i<o.length-1;i++){const d=haversine(locations[o[i]],locations[o[i+1]]);if(d>maxLeg){maxLeg=d;maxPair=locations[o[i]].name+' → '+locations[o[i+1]].name;}}
-    PLAN={mode:'route',transport:m.label,km,cost,hours,co2,stops:locations.length,maxLeg,maxPair,order:o.map(i=>locations[i].name)};
-    renderPlanKpis();renderInsights();
-    $('planNote').innerHTML=`Optimized a <b>${locations.length}-city</b> ${m.label} route: <b>${Math.round(km).toLocaleString()} km</b>, ~${hours<48?hours.toFixed(1)+' h':(hours/24).toFixed(1)+' days'}.`;
-    botSay(`Optimized your ${locations.length}-city ${m.label} route (TSP, nearest-neighbor + 2-opt): ${Math.round(km).toLocaleString()} km, est. $${Math.round(cost).toLocaleString()}, ~${(hours/24).toFixed(1)} days, ${Math.round(co2).toLocaleString()} kg CO₂. Longest leg: ${maxPair}.`);
-  } else {
-    const k=+$('kHub').value;const {chosen,assign,total}=hubSolve(k);
-    drawMarkers(null,assign,chosen);
-    // recolor chosen hubs
-    chosen.forEach(ci=>{const l=locations[ci];L.circleMarker([l.lat,l.lon],{radius:9,color:'#08111c',weight:2,fillColor:'#f59e0b',fillOpacity:1}).addTo(layerGroup).bindPopup('<b>HUB: '+l.name+'</b>');});
-    PLAN={mode:'hub',hubs:chosen.map(i=>locations[i].name),demand:locations.length,total};
-    renderPlanKpis();renderInsights();
-    $('planNote').innerHTML=`Opened <b>${chosen.length}</b> hub(s) — ${chosen.map(i=>locations[i].name).join(', ')} — serving <b>${locations.length}</b> cities at min total distance.`;
-    botSay(`Hub designer opened ${chosen.length} hub(s): ${chosen.map(i=>locations[i].name).join(', ')}, serving ${locations.length} cities. Total weighted distance ${Math.round(total).toLocaleString()} km.`);
-  }
-}
-function renderPlanKpis(){
-  let cards=[];
-  if(PLAN.mode==='route'){
-    if(KPIVIS.distance)cards.push(['Total distance',Math.round(PLAN.km).toLocaleString(),'km']);
-    if(KPIVIS.cost)cards.push(['Est. cost','$'+Math.round(PLAN.cost).toLocaleString(),'']);
-    if(KPIVIS.time)cards.push(['Transit time',PLAN.hours<48?PLAN.hours.toFixed(1):(PLAN.hours/24).toFixed(1),PLAN.hours<48?'h':'days']);
-    if(KPIVIS.co2)cards.push(['CO₂ (per ton)',Math.round(PLAN.co2).toLocaleString(),'kg']);
-    if(KPIVIS.legs)cards.push(['Stops',PLAN.stops,'']);
-  } else {
-    cards.push(['Hubs opened',PLAN.hubs.length,'']);
-    cards.push(['Cities served',PLAN.demand,'']);
-    cards.push(['Total distance',Math.round(PLAN.total).toLocaleString(),'km']);
-    cards.push(['Avg / city',Math.round(PLAN.total/PLAN.demand).toLocaleString(),'km']);
-  }
-  $('planKpis').innerHTML=cards.map(([k,v,u])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');
-}
-function renderInsights(){
-  let html='';
-  if(PLAN.mode==='route'){
-    if(KPIVIS.legs&&PLAN.maxPair)html+=`<details open><summary>Longest leg</summary><div class="body"><b>${PLAN.maxPair}</b> at ${Math.round(PLAN.maxLeg).toLocaleString()} km — the biggest single hop. Consider a consolidation stop or a different mode for this leg.</div></details>`;
-    if(CARDVIS.mode){const alt=Object.entries(PLANMODES).map(([k,m])=>({k,cost:PLAN.km*m.rate,days:PLAN.km/m.speed/24,label:m.label})).sort((a,b)=>a.cost-b.cost);
-      html+=`<details><summary>Mode recommendation</summary><div class="body">Cheapest for this distance: <b>${alt[0].label}</b> (~$${Math.round(alt[0].cost).toLocaleString()}, ${alt[0].days.toFixed(1)} d). Fastest: <b>${alt.slice().sort((a,b)=>a.days-b.days)[0].label}</b>. You're on <b>${PLAN.transport}</b>.</div></details>`;}
-    if(CARDVIS.centroid){const cg=centroid();html+=`<details><summary>Center of gravity</summary><div class="body">The demand-weighted center of your cities sits near <b>${cg.nearest[0]}, ${cg.nearest[1]}</b>. A depot/DC there minimizes average outbound distance.</div></details>`;}
-  } else {
-    if(CARDVIS.centroid){const cg=centroid();html+=`<details open><summary>Center of gravity</summary><div class="body">Network centroid is near <b>${cg.nearest[0]}, ${cg.nearest[1]}</b> — a strong single-DC candidate to benchmark your multi-hub solution against.</div></details>`;}
-    html+=`<details><summary>Assignment summary</summary><div class="body">Each city is served by its nearest open hub. Increase "Hubs to open" to cut average distance (diminishing returns), or mark specific cities as candidate hubs with the ⬤ toggle.</div></details>`;
-  }
-  $('planInsights').innerHTML=html;
-}
-
-/* ===================== EXEC + COST (data) ===================== */
-const MODAL={value:[['Truck',73,'#3b82f6'],['Multiple modes & mail',12,'#a78bfa'],['Pipeline',5,'#f87171'],['Rail',3,'#34d399'],['Air',2,'#fbbf24'],['Water',1,'#22d3ee'],['Other',4,'#64748b']],
-  weight:[['Truck',65,'#3b82f6'],['Rail',11,'#34d399'],['Pipeline',10,'#f87171'],['Water',5,'#22d3ee'],['Multiple modes & mail',3,'#a78bfa'],['Air',1,'#fbbf24'],['Other',5,'#64748b']]};
-const INTL=[['Water',47,'#22d3ee'],['Air',27,'#fbbf24'],['Truck',18,'#3b82f6'],['Rail/Other',8,'#34d399']];
-const COMMODITY=[
-  {cat:'Energy & fuels',items:[['Crude oil','Pipeline → Marine tanker'],['Refined products','Pipeline / Rail / Truck'],['LNG / natural gas','Pipeline / specialized marine']]},
-  {cat:'Bulk raw materials',items:[['Coal, ores, aggregates','Rail + inland barge'],['Grain / agriculture','Rail + barge / ocean bulk'],['Cement / steel','Rail / truck']]},
-  {cat:'Chemicals',items:[['Bulk/liquid chemicals','Rail tank / pipeline / marine'],['Hazmat','Specialized truck & rail']]},
-  {cat:'Manufactured & consumer goods',items:[['Retail goods (domestic)','Truck'],['Imports (containerized)','Ocean container → truck/rail'],['Appliances/furniture','Intermodal rail + truck']]},
-  {cat:'Perishables & food',items:[['Produce, frozen','Refrigerated truck (reefer)'],['Intl perishables','Reefer ocean / air']]},
-  {cat:'High-value / time-critical',items:[['Electronics, semiconductors','Air'],['Pharma, medical','Air (temp-controlled)'],['Luxury, e-commerce express','Air + ground']]},
-  {cat:'Automotive',items:[['Finished vehicles','Rail + Ro-Ro vessel + truck'],['Parts (JIT)','Truck / air expedite']]}
+/* ---- reference data ---- */
+const CARRIERS=[
+ {name:'Maersk',mode:'Ocean',rel:.94,tender:.97,dmg:.004,cpm:2.8},
+ {name:'MSC',mode:'Ocean',rel:.90,tender:.95,dmg:.006,cpm:2.6},
+ {name:'Hapag-Lloyd',mode:'Ocean',rel:.93,tender:.96,dmg:.005,cpm:2.9},
+ {name:'CMA CGM',mode:'Ocean',rel:.89,tender:.94,dmg:.007,cpm:2.7},
+ {name:'DHL Express',mode:'Air',rel:.97,tender:.98,dmg:.003,cpm:6.4},
+ {name:'FedEx',mode:'Air',rel:.96,tender:.97,dmg:.004,cpm:6.1},
+ {name:'UPS Air',mode:'Air',rel:.95,tender:.96,dmg:.004,cpm:6.0},
+ {name:'DB Schenker',mode:'Rail',rel:.92,tender:.95,dmg:.005,cpm:1.5},
+ {name:'DSV Road',mode:'Road',rel:.90,tender:.93,dmg:.008,cpm:2.1},
+ {name:'XPO',mode:'Road',rel:.88,tender:.91,dmg:.010,cpm:2.0},
+ {name:'Kuehne+Nagel',mode:'Road',rel:.92,tender:.95,dmg:.006,cpm:2.2}
 ];
+const COMMODITIES=[
+ {name:'Electronics',hs:'8517',duty:0,vk:42},{name:'Semiconductors',hs:'8541',duty:0,vk:280},
+ {name:'Apparel',hs:'6203',duty:.166,vk:18},{name:'Auto parts',hs:'8708',duty:.025,vk:12},
+ {name:'Pharma',hs:'3004',duty:0,vk:120},{name:'Machinery',hs:'8479',duty:0,vk:22},
+ {name:'Furniture',hs:'9403',duty:0,vk:6},{name:'Steel & metals',hs:'7208',duty:0,vk:1.5},
+ {name:'Chemicals',hs:'2902',duty:.037,vk:3},{name:'Food & bev',hs:'2106',duty:.05,vk:4},
+ {name:'Toys',hs:'9503',duty:0,vk:8},{name:'Crude oil',hs:'2709',duty:.001,vk:.6}
+];
+const COM=Object.fromEntries(COMMODITIES.map(c=>[c.name,c]));
+const INCOTERMS=[
+ {code:'EXW',name:'Ex Works',mode:'Any',risk:5,riskTxt:"Seller's premises (at buyer's disposal)",exp:'B',freight:'B',ins:'—',imp:'B',use:'Ex-factory; buyer controls the whole chain.'},
+ {code:'FCA',name:'Free Carrier',mode:'Any',risk:18,riskTxt:'Handed to buyer-nominated carrier',exp:'S',freight:'B',ins:'—',imp:'B',use:'Most flexible; preferred for containers (modern FOB).'},
+ {code:'FAS',name:'Free Alongside Ship',mode:'Sea',risk:30,riskTxt:'Alongside the vessel at origin port',exp:'S',freight:'B',ins:'—',imp:'B',use:'Bulk / break-bulk at port.'},
+ {code:'FOB',name:'Free On Board',mode:'Sea',risk:35,riskTxt:'When loaded on board the vessel',exp:'S',freight:'B',ins:'—',imp:'B',use:'Traditional (non-containerized) sea freight.'},
+ {code:'CFR',name:'Cost & Freight',mode:'Sea',risk:35,riskTxt:'On board at origin (seller pays freight to dest port)',exp:'S',freight:'S',ins:'—',imp:'B',use:'Seller books ocean freight; risk still passes early.'},
+ {code:'CIF',name:'Cost, Insurance & Freight',mode:'Sea',risk:35,riskTxt:'On board at origin; seller buys min. insurance',exp:'S',freight:'S',ins:'S·min',imp:'B',use:'CFR + seller insurance (ICC clause C).'},
+ {code:'CPT',name:'Carriage Paid To',mode:'Any',risk:18,riskTxt:'To first carrier at origin; carriage seller-paid',exp:'S',freight:'S',ins:'—',imp:'B',use:'Any-mode equivalent of CFR.'},
+ {code:'CIP',name:'Carriage & Insurance Paid To',mode:'Any',risk:18,riskTxt:'To first carrier; seller buys all-risk insurance',exp:'S',freight:'S',ins:'S·all',imp:'B',use:'Any-mode CIF; 2020 raised cover to ICC(A).'},
+ {code:'DAP',name:'Delivered At Place',mode:'Any',risk:90,riskTxt:'At destination, ready for unloading',exp:'S',freight:'S',ins:'—',imp:'B',use:'Seller delivers to door; buyer clears import.'},
+ {code:'DPU',name:'Delivered At Place Unloaded',mode:'Any',risk:95,riskTxt:'At destination, after unloading',exp:'S',freight:'S',ins:'—',imp:'B',use:'Only term where the seller unloads (replaced DAT).'},
+ {code:'DDP',name:'Delivered Duty Paid',mode:'Any',risk:100,riskTxt:'At destination, import cleared & duties paid',exp:'S',freight:'S',ins:'—',imp:'S',use:'Max seller responsibility; turnkey for buyer.'}
+];
+const INC=Object.fromEntries(INCOTERMS.map(i=>[i.code,i]));
+const CUSTOMERS=['Northwind Retail','Acme Industrial','Globex Corp','Initech','Umbrella Health','Stark Mfg','Wayne Stores','Soylent Foods'];
+const LANES=[
+ ['Shanghai','Los Angeles','Ocean','Electronics'],['Shenzhen','Rotterdam','Ocean','Electronics'],['Ningbo','Hamburg','Ocean','Furniture'],
+ ['Busan','Los Angeles','Ocean','Auto parts'],['Singapore','Rotterdam','Ocean','Chemicals'],['Ras Tanura','Ningbo','Ocean','Crude oil'],
+ ['Houston','Rotterdam','Ocean','Crude oil'],['Mumbai','Dubai','Ocean','Apparel'],['Chennai','Hamburg','Ocean','Auto parts'],
+ ['Guangzhou','Sydney','Ocean','Toys'],['Santos','Shanghai','Ocean','Steel & metals'],['Jeddah','Mumbai','Ocean','Chemicals'],
+ ['Antwerp','New York','Ocean','Chemicals'],['Frankfurt','New York','Air','Pharma'],['Tokyo','San Francisco','Air','Semiconductors'],
+ ['Shenzhen','Chicago','Air','Electronics'],['Seoul','Los Angeles','Air','Semiconductors'],['Hong Kong','London','Air','Pharma'],
+ ['Monterrey','Dallas','Road','Auto parts'],['Chicago','Toronto','Road','Machinery'],['Los Angeles','Phoenix','Road','Food & bev'],
+ ['Dallas','Atlanta','Road','Food & bev'],['Berlin','Warsaw','Rail','Machinery'],['Shanghai','Hamburg','Rail','Electronics'],
+ ['Rotterdam','Milan','Rail','Food & bev'],['Los Angeles','Chicago','Rail','Furniture']
+];
+const MODESPEED={Ocean:{kmday:650,base:0.025,co2:10,buf:5},Air:{kmday:6500,base:0.45,co2:500,buf:1},Road:{kmday:850,base:0.13,co2:62,buf:1},Rail:{kmday:680,base:0.045,co2:22,buf:1}};
+const MODECOL={Ocean:'#22d3ee',Air:'#a78bfa',Road:'#fbbf24',Rail:'#34d399'};
+
+/* should-cost engine (shared) */
+function shouldCost({dist,mode,weightKg,fuel,acc,dray}){
+  const ms=MODESPEED[mode]||MODESPEED.Ocean;
+  const lineHaul=ms.base*weightKg*(dist/1000);
+  const fuelAmt=lineHaul*((fuel||0)/100);
+  return lineHaul+fuelAmt+(acc||0)+(dray||0);
+}
+
+/* ---- date utils ---- */
+const TODAY=new Date('2026-06-16T00:00:00');
+const dstr=d=>d.toISOString().slice(0,10);
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const parseD=s=>new Date(s+'T00:00:00');
+
+/* ---- synthetic shipments ---- */
+let SHIPMENTS=[];
+function genShipments(){
+  _seed=987654321;SHIPMENTS=[];
+  const geoHot=['Ras Tanura','Jeddah','Mumbai','Dubai'];
+  for(let i=0;i<58;i++){
+    const lane=spick(LANES),o=COORD[lane[0]],d=COORD[lane[1]],mode=lane[2],com=lane[3];
+    const dist=haversine(o,d),ms=MODESPEED[mode];
+    const pool=CARRIERS.filter(c=>c.mode===mode),carrier=spick(pool.length?pool:CARRIERS);
+    const planned=Math.max(2,Math.round(dist/ms.kmday)+ms.buf);
+    const slaTarget=planned+Math.max(1,Math.round(planned*0.15));
+    const etd=addDays(TODAY,sint(-30,4)),eta=addDays(etd,planned);
+    let risk=sint(5,32);
+    if(geoHot.includes(lane[0])||geoHot.includes(lane[1]))risk+=sint(15,42);
+    if(mode==='Ocean')risk+=sint(0,12);if(mode==='Air')risk=Math.max(2,risk-sint(0,8));
+    risk=Math.max(2,Math.min(98,risk));
+    const delayDays=sr()<risk/120?sint(1,Math.round(planned*0.5)+2):0;
+    const weightKg=mode==='Ocean'?sint(8000,26000):mode==='Air'?sint(300,4200):sint(2000,18000);
+    const cobj=COM[com]||COMMODITIES[0],value=Math.round(weightKg*cobj.vk);
+    const dray=mode==='Ocean'?600:mode==='Rail'?250:0;
+    const should=shouldCost({dist,mode,weightKg,fuel:18,acc:300,dray});
+    const over=sr()<0.32?1+sint(9,28)/100:1+sint(-5,7)/100;
+    const invoiced=Math.round(should*over);
+    let status,actualDelivery=null,onTime=null,inFull=null,actualTransit=null;
+    if(eta<TODAY){actualTransit=planned+delayDays;actualDelivery=addDays(etd,actualTransit);status='Delivered';onTime=actualDelivery<=addDays(etd,slaTarget);inFull=sr()>0.06;}
+    else if(etd>TODAY){status='At Origin';}
+    else{if(delayDays>0&&risk>55&&sr()<0.5)status='Exception';else if(delayDays>0)status='Delayed';else if(sr()<0.12)status='Customs Hold';else status='In Transit';}
+    const co2=Math.round(dist*(weightKg/1000)*ms.co2/1000);
+    const freeDays=mode==='Ocean'?5:3;
+    let daysUsed=mode==='Ocean'&&sr()<0.4?freeDays+sint(1,7):freeDays-sint(0,3);daysUsed=Math.max(0,daysUsed);
+    const dndDays=Math.max(0,daysUsed-freeDays),dndRate=mode==='Ocean'?150:90,dndCost=dndDays*dndRate;
+    const predEta=addDays(eta,Math.round(risk/100*(mode==='Ocean'?6:mode==='Air'?1.5:3))+((status==='Delayed'||status==='Exception')?delayDays:0));
+    let exc=null;
+    if(status==='Exception')exc=spick(['Port congestion','Geopolitical reroute','Equipment failure','Damage reported']);
+    else if(status==='Customs Hold')exc='Customs documentation hold';
+    else if(status==='Delayed')exc=spick(['Weather delay','Carrier delay','Port congestion']);
+    else if(dndDays>0)exc='Demurrage accruing';
+    const revenue=Math.round(invoiced*(1+sint(-18,72)/100)+value*0.02);
+    SHIPMENTS.push({id:'SHP-'+(1000+i),o:lane[0],d:lane[1],oc:o,dc:d,mode,carrier:carrier.name,commodity:com,hs:cobj.hs,customer:spick(CUSTOMERS),
+      incoterm:spick(INCOTERMS).code,dist:Math.round(dist),weightKg,value,etd:dstr(etd),eta:dstr(eta),predEta:dstr(predEta),
+      actualDelivery:actualDelivery?dstr(actualDelivery):null,slaTarget,planned,status,onTime,inFull,risk,co2,
+      should:Math.round(should),invoiced,freeDays,daysUsed,dndDays,dndCost,exc,revenue});
+  }
+}
+const active=()=>SHIPMENTS.filter(s=>s.status!=='Delivered'&&s.status!=='At Origin');
+const delivered=()=>SHIPMENTS.filter(s=>s.status==='Delivered');
+const riskBadge=r=>{const c=r>=60?'rag-r':r>=35?'rag-a':'rag-g';return `<span class="pill ${c}">${r}</span>`;};
+const stClass=s=>'st-'+s.replace(/\s/g,'');
+
+/* ---- Excel I/O ---- */
+function exportXlsx(filename,sheets){const wb=XLSX.utils.book_new();sheets.forEach(s=>{const ws=Array.isArray(s.rows[0])?XLSX.utils.aoa_to_sheet(s.rows):XLSX.utils.json_to_sheet(s.rows);if(s.w)ws['!cols']=s.w;XLSX.utils.book_append_sheet(wb,ws,s.name);});XLSX.writeFile(wb,filename);}
+function importXlsx(file,cb){const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];cb(XLSX.utils.sheet_to_json(ws,{defval:''}));}catch(err){toast('Import failed: '+err.message);}};r.readAsArrayBuffer(file);}
+
+/* ---- charts ---- */
+const CHARTS={};
+function mkChart(id,cfg){if(CHARTS[id]){CHARTS[id].destroy();}const el=$(id);if(!el)return;CHARTS[id]=new Chart(el.getContext('2d'),cfg);return CHARTS[id];}
+const CC=['#3b82f6','#22d3ee','#a78bfa','#34d399','#fbbf24','#f87171','#f472b6','#60a5fa','#2dd4bf','#fb923c','#c084fc','#4ade80'];
+if(window.Chart){Chart.defaults.color='#8b97a7';Chart.defaults.borderColor='#283341';Chart.defaults.font.family='inherit';Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.maintainAspectRatio=false;Chart.defaults.responsive=true;}
+function sparkSVG(vals,col){const w=58,h=20,mx=Math.max(...vals),mn=Math.min(...vals),rg=(mx-mn)||1;const pts=vals.map((v,i)=>`${(i/(vals.length-1))*w},${h-((v-mn)/rg)*h}`).join(' ');return `<svg class="spark" width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/></svg>`;}
+
+/* =========================================================================
+   LINEAR-PROGRAM SOLVER (two-phase simplex) with SENSITIVITY ANALYSIS
+   ========================================================================= */
+function solveLP(model){
+  const maximize=model.sense==='max';
+  const vars=model.vars.map(v=>v.name),nV=vars.length;
+  const objOf={};model.vars.forEach(v=>objOf[v.name]=+v.obj||0);
+  let cons=model.cons.map(c=>({name:c.name,coef:Object.assign({},c.coef),sense:c.sense,rhs:+c.rhs,bound:false}));
+  model.vars.forEach(v=>{
+    if(v.lo!=null&&+v.lo>0)cons.push({name:v.name+' ≥ lo',coef:{[v.name]:1},sense:'>=',rhs:+v.lo,bound:true});
+    if(v.hi!=null&&+v.hi<1e8)cons.push({name:v.name+' ≤ cap',coef:{[v.name]:1},sense:'<=',rhs:+v.hi,bound:true});
+  });
+  cons.forEach(con=>{if(con.rhs<0){for(const k in con.coef)con.coef[k]*=-1;con.rhs*=-1;con.sense=con.sense==='<='?'>=':con.sense==='>='?'<=':'=';}});
+  const m=cons.length;
+  const cols=[];vars.forEach(v=>cols.push({type:'x',name:v,cost:(maximize?1:-1)*objOf[v]}));
+  const info=[],artCols=[];
+  cons.forEach((con,i)=>{const o={};
+    if(con.sense==='<='){cols.push({type:'s',name:'slk'+i,cost:0});o.slack=cols.length-1;o.id=o.slack;}
+    else if(con.sense==='>='){cols.push({type:'e',name:'sur'+i,cost:0});o.sur=cols.length-1;cols.push({type:'a',name:'art'+i,cost:0});o.art=cols.length-1;o.id=o.art;artCols.push(o.art);}
+    else{cols.push({type:'a',name:'art'+i,cost:0});o.art=cols.length-1;o.id=o.art;artCols.push(o.art);}
+    info.push(o);});
+  const nCol=cols.length,A=[],b=cons.map(c=>c.rhs);
+  for(let i=0;i<m;i++){const row=new Array(nCol).fill(0);for(const k in cons[i].coef){const j=vars.indexOf(k);if(j>=0)row[j]=cons[i].coef[k];}const o=info[i];if(o.slack!=null)row[o.slack]=1;if(o.sur!=null)row[o.sur]=-1;if(o.art!=null)row[o.art]=1;A.push(row);}
+  const basis=info.map(o=>o.id);
+  function simplex(cost){let it=0;while(it++<5000){const cB=basis.map(bi=>cost[bi]);const z=new Array(nCol).fill(0);for(let j=0;j<nCol;j++){let s=0;for(let i=0;i<m;i++)s+=cB[i]*A[i][j];z[j]=s;}let ent=-1,best=1e-7;for(let j=0;j<nCol;j++){const rc=cost[j]-z[j];if(rc>best){best=rc;ent=j;}}if(ent<0)return'ok';let lv=-1,mr=Infinity;for(let i=0;i<m;i++){if(A[i][ent]>1e-9){const r=b[i]/A[i][ent];if(r<mr-1e-12){mr=r;lv=i;}}}if(lv<0)return'unbounded';const p=A[lv][ent];for(let j=0;j<nCol;j++)A[lv][j]/=p;b[lv]/=p;for(let i=0;i<m;i++)if(i!==lv&&Math.abs(A[i][ent])>1e-12){const f=A[i][ent];for(let j=0;j<nCol;j++)A[i][j]-=f*A[lv][j];b[i]-=f*b[lv];}basis[lv]=ent;}return'ok';}
+  if(artCols.length){const p1=new Array(nCol).fill(0);artCols.forEach(a=>p1[a]=-1);simplex(p1);if(basis.some((bi,i)=>artCols.includes(bi)&&b[i]>1e-6))return{status:'infeasible'};}
+  const realCost=cols.map((c,j)=>artCols.includes(j)?-1e7:c.cost);
+  if(simplex(realCost)==='unbounded')return{status:'unbounded'};
+  const xval={};vars.forEach(v=>xval[v]=0);basis.forEach((bi,i)=>{if(cols[bi].type==='x')xval[cols[bi].name]=Math.max(0,b[i]);});
+  const obj=vars.reduce((s,v)=>s+objOf[v]*xval[v],0);
+  const cB=basis.map(bi=>realCost[bi]);const z=new Array(nCol).fill(0);for(let j=0;j<nCol;j++){let s=0;for(let i=0;i<m;i++)s+=cB[i]*A[i][j];z[j]=s;}
+  const sgn=maximize?1:-1;
+  // reduced costs (original sense)
+  const reduced=vars.map((v,j)=>({name:v,value:xval[v],rc:sgn*(realCost[j]-z[j]),basic:basis.includes(j)}));
+  // objective coefficient ranging
+  reduced.forEach(r=>{const j=vars.indexOf(r.name);if(!r.basic){const inc=-(realCost[j]-z[j]);r.objInc=sgn>0?inc:Infinity;r.objDec=sgn>0?Infinity:inc;}else{const row=basis.indexOf(j);let up=Infinity,dn=Infinity;for(let k=0;k<nCol;k++){if(basis.includes(k))continue;const ark=A[row][k],rck=realCost[k]-z[k];if(ark>1e-9)dn=Math.min(dn,rck/ark*-1);else if(ark<-1e-9)up=Math.min(up,rck/ark*-1);}r.objInc=sgn>0?up:dn;r.objDec=sgn>0?dn:up;}});
+  // constraint duals + RHS ranging (only real constraints, not bounds reported separately)
+  const shadow=cons.map((con,i)=>{const idc=info[i].slack!=null?info[i].slack:info[i].id;const y=sgn*z[idc];const col=A.map(row=>row[idc]);let inc=Infinity,dec=Infinity;for(let r=0;r<m;r++){const dr=col[r];if(dr>1e-9)dec=Math.min(dec,b[r]/dr);else if(dr<-1e-9)inc=Math.min(inc,b[r]/-dr);}
+    let lhs=0;for(const k in con.coef)lhs+=con.coef[k]*(xval[k]||0);
+    return{name:con.name,bound:con.bound,sense:con.sense,rhs:con.rhs,lhs:lhs,slack:Math.abs(con.rhs-lhs),binding:Math.abs(con.rhs-lhs)<1e-6,shadow:Math.abs(y)<1e-7?0:y,rhsInc:inc,rhsDec:dec};});
+  return{status:'optimal',objective:obj,vars:reduced,values:xval,constraints:shadow};
+}
+const rng=v=>v===Infinity||v>1e6?'∞':f1(v);
+
+/* =========================================================================
+   SHARED GEO HELPERS
+   ========================================================================= */
+function arcPts(a,b,n){n=n||48;const toR=Math.PI/180;const lat1=a.lat*toR,lon1=a.lon*toR,lat2=b.lat*toR,lon2=b.lon*toR;
+  const d=2*Math.asin(Math.sqrt(Math.sin((lat2-lat1)/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin((lon2-lon1)/2)**2));
+  if(d===0)return[[a.lat,a.lon]];const pts=[];for(let i=0;i<=n;i++){const f=i/n;const A=Math.sin((1-f)*d)/Math.sin(d),B=Math.sin(f*d)/Math.sin(d);
+  const x=A*Math.cos(lat1)*Math.cos(lon1)+B*Math.cos(lat2)*Math.cos(lon2);const y=A*Math.cos(lat1)*Math.sin(lon1)+B*Math.cos(lat2)*Math.sin(lon2);const z=A*Math.sin(lat1)+B*Math.sin(lat2);
+  pts.push([Math.atan2(z,Math.sqrt(x*x+y*y))/toR,Math.atan2(y,x)/toR]);}return pts;}
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+function weeklySeries(){const dv=delivered();if(!dv.length)return{labels:[],otd:[],otif:[]};
+  const base=Math.min(...dv.map(s=>parseD(s.actualDelivery).getTime()));const bucket={};
+  dv.forEach(s=>{const wk=Math.floor((parseD(s.actualDelivery)-base)/(7*864e5));(bucket[wk]=bucket[wk]||[]).push(s);});
+  const keys=Object.keys(bucket).map(Number).sort((a,b)=>a-b);
+  return{labels:keys.map(k=>'W'+(k+1)),otd:keys.map(k=>Math.round(avg(bucket[k].map(s=>s.onTime?100:0)))),otif:keys.map(k=>Math.round(avg(bucket[k].map(s=>(s.onTime&&s.inFull)?100:0))))};}
+
+/* =========================================================================
+   CONTROL TOWER
+   ========================================================================= */
+let ctMap,ctLayer;
+function initCTMap(){ctMap=L.map('ctmap',{worldCopyJump:true,minZoom:2}).setView([28,20],2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:12}).addTo(ctMap);
+  ctLayer=L.layerGroup().addTo(ctMap);}
+function drawCTMap(list){if(!ctLayer)return;ctLayer.clearLayers();
+  list.forEach(s=>{const col=MODECOL[s.mode]||'#3b82f6';const risky=s.risk>=60||s.status==='Exception'||s.status==='Delayed'||s.status==='Customs Hold';
+    L.polyline(arcPts(s.oc,s.dc),{color:col,weight:risky?2.6:1.6,opacity:risky?.95:.55,dashArray:s.status==='At Origin'?'4 6':null}).addTo(ctLayer).bindPopup(`<b>${s.id}</b> · ${s.mode}<br>${s.o} → ${s.d}<br>${s.carrier}<br>ETA ${s.eta} · risk ${s.risk}`);
+    if(risky){const f=Math.max(.05,Math.min(.95,(TODAY-parseD(s.etd))/((s.planned||1)*864e5)));const p=arcPts(s.oc,s.dc,40);const pos=p[Math.round(f*(p.length-1))]||p[0];
+      L.circleMarker(pos,{radius:5,color:'#08111c',weight:1.5,fillColor:'#f87171',fillOpacity:.95}).addTo(ctLayer).bindPopup(`<b>⚠ ${s.id}</b><br>${esc(s.exc||'At risk')}<br>${s.o} → ${s.d}`);}});
+  // origin/dest dots
+  const seen={};list.forEach(s=>{[['o','oc','#f59e0b'],['d','dc','#34d399']].forEach(([nk,ck,col])=>{const key=s[nk];if(seen[key])return;seen[key]=1;const c=s[ck];L.circleMarker([c.lat,c.lon],{radius:3,color:col,weight:1,fillColor:col,fillOpacity:.8}).addTo(ctLayer);});});}
+
+function ctKpiCards(){const ws=weeklySeries();const dv=delivered();
+  const otif=dv.length?avg(dv.map(s=>(s.onTime&&s.inFull)?100:0)):0;
+  const otd=dv.length?avg(dv.map(s=>s.onTime?100:0)):0;
+  const inT=SHIPMENTS.filter(s=>s.status==='In Transit').length;
+  const atO=SHIPMENTS.filter(s=>s.status==='At Origin').length;
+  const exc=active().filter(s=>s.exc).length;
+  const atR=active().filter(s=>s.risk>=60).length;
+  const avgRisk=Math.round(avg(active().map(s=>s.risk)));
+  const spend=SHIPMENTS.reduce((a,s)=>a+s.invoiced,0);
+  const rag=(v,t)=>v>=t?'rg':v>=t-7?'ra':'rr';
+  const cards=[
+    {k:'OTIF (delivered)',v:pct(otif),cls:rag(otif,95),sub:'target 95%',spark:ws.otif.length?sparkSVG(ws.otif,'#34d399'):''},
+    {k:'On-time delivery',v:pct(otd),cls:rag(otd,95),sub:'target 95%',spark:ws.otd.length?sparkSVG(ws.otd,'#22d3ee'):''},
+    {k:'In transit',v:inT,cls:'rb',sub:atO+' at origin'},
+    {k:'Open exceptions',v:exc,cls:exc>6?'rr':exc>3?'ra':'rg',sub:'in the inbox'},
+    {k:'At-risk shipments',v:atR,cls:atR>5?'rr':atR>2?'ra':'rg',sub:'risk ≥ 60'},
+    {k:'Avg disruption risk',v:avgRisk,cls:avgRisk>50?'rr':avgRisk>35?'ra':'rg',sub:'active legs'},
+    {k:'Freight spend',v:f$(spend),cls:'rb',sub:SHIPMENTS.length+' shipments'},
+    {k:'D&D leakage',v:f$(SHIPMENTS.reduce((a,s)=>a+s.dndCost,0)),cls:'ra',sub:'detention + demurrage'}
+  ];
+  $('ctKpis').innerHTML=cards.map(c=>`<div class="kpi ${c.cls}"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="sub2">${c.sub}</div>${c.spark||''}</div>`).join('');}
+
+function severityOf(s){if(s.status==='Exception'||s.risk>=70)return'r';if(s.status==='Delayed'||s.status==='Customs Hold'||s.risk>=45)return'a';return'b';}
+function renderInbox(){const items=active().filter(s=>s.exc||s.risk>=55).sort((a,b)=>b.risk-a.risk);
+  if(!items.length){$('excInbox').innerHTML='<div class="hint">No open exceptions — network is clean. 🎉</div>';return;}
+  $('excInbox').innerHTML=items.map(s=>{const sev=severityOf(s);const delay=Math.max(0,Math.round((parseD(s.predEta)-parseD(s.eta))/864e5));
+    return `<div class="exc sev-${sev}" data-id="${s.id}">
+      <div class="top"><span class="ttl">${esc(s.exc||'Elevated risk')}</span>${riskBadge(s.risk)}</div>
+      <div class="meta">${s.id} · ${s.o} → ${s.d} · ${s.mode} · ${esc(s.carrier)}${delay>0?` · <b style="color:var(--warn)">+${delay}d ETA slip</b>`:''}${s.dndDays>0?` · D&D ${f$(s.dndCost)}`:''}</div>
+      <div class="acts">
+        <button class="mini go" data-act="reroute" data-id="${s.id}">↪ Reroute</button>
+        <button class="mini" data-act="switch" data-id="${s.id}">🔁 Switch carrier</button>
+        ${s.dndDays>0?`<button class="mini" data-act="dnd" data-id="${s.id}">📝 File D&D dispute</button>`:''}
+        <button class="mini" data-act="open" data-id="${s.id}">↗ Detail</button>
+        <button class="mini" data-act="dismiss" data-id="${s.id}">✓ Resolve</button>
+      </div></div>`;}).join('');
+  $('excInbox').querySelectorAll('button[data-act]').forEach(b=>b.onclick=()=>excAction(b.dataset.act,b.dataset.id));}
+
+function excAction(act,id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;
+  if(act==='open'){openShipment(id);return;}
+  if(act==='reroute'){s.status='In Transit';s.risk=Math.max(8,Math.round(s.risk*0.55));s.predEta=s.eta;s.exc=null;toast(`${id} rerouted — risk cut to ${s.risk}.`);botSay(`↪ Rerouted ${id} (${s.o}→${s.d}). Disruption risk reduced to ${s.risk}; predicted ETA recovered to ${s.eta}.`);}
+  if(act==='switch'){const alts=CARRIERS.filter(c=>c.mode===s.mode&&c.name!==s.carrier).sort((a,b)=>b.rel-a.rel);if(alts.length){const old=s.carrier;s.carrier=alts[0].name;s.risk=Math.max(8,s.risk-12);s.exc=null;if(s.status==='Exception')s.status='In Transit';toast(`Carrier switched ${old} → ${s.carrier}.`);botSay(`🔁 Switched ${id} from ${old} to ${s.carrier} (higher reliability ${(alts[0].rel*100).toFixed(0)}%). Risk now ${s.risk}.`);}}
+  if(act==='dnd'){const rec=s.dndCost;s.dndCost=0;s.dndDays=0;s.exc=null;toast(`D&D dispute filed — ${f$(rec)} flagged for recovery.`);botSay(`📝 Filed a detention & demurrage dispute on ${id}: ${f$(rec)} flagged for recovery from the carrier/terminal.`);}
+  if(act==='dismiss'){s.exc=null;if(s.status==='Exception'||s.status==='Delayed'||s.status==='Customs Hold')s.status='In Transit';s.risk=Math.max(6,Math.round(s.risk*0.5));toast(`${id} resolved.`);}
+  renderControl();}
+
+function ctFiltered(){const q=($('ctSearch').value||'').toLowerCase(),m=$('ctMode').value,st=$('ctStatus').value,ca=$('ctCarrier').value;
+  return SHIPMENTS.filter(s=>(!m||s.mode===m)&&(!st||s.status===st)&&(!ca||s.carrier===ca)&&(!q||[s.id,s.o,s.d,s.carrier,s.commodity,s.customer].join(' ').toLowerCase().includes(q)));}
+function renderCTTable(){const list=ctFiltered();
+  $('ctBody').innerHTML=list.map(s=>{const slip=parseD(s.predEta)>parseD(s.eta);
+    return `<tr class="clk" data-id="${s.id}"><td><b>${s.id}</b></td><td>${s.o} → ${s.d}</td><td><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span></td><td>${esc(s.carrier)}</td><td>${s.commodity}</td><td>${s.eta}</td><td style="color:${slip?'var(--warn)':'var(--muted)'}">${s.predEta}</td><td>${riskBadge(s.risk)}</td><td><span class="st ${stClass(s.status)}">${s.status}</span></td><td>${s.status==='Delivered'?(s.onTime&&s.inFull?'<span class="pill rag-g">OTIF</span>':s.onTime?'<span class="pill rag-a">late-in-full</span>':'<span class="pill rag-r">miss</span>'):'—'}</td></tr>`;}).join('');
+  $('ctBody').querySelectorAll('tr').forEach(r=>r.onclick=()=>openShipment(r.dataset.id));
+  $('ctNote').innerHTML=`Showing <b>${list.length}</b> of ${SHIPMENTS.length} shipments · ${active().length} active · ${active().filter(s=>s.exc).length} flagged.`;}
+
+function openShipment(id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;const inc=INC[s.incoterm];
+  $('ctDetail').innerHTML=`<h2>${s.id} <span class="st ${stClass(s.status)}">${s.status}</span></h2>
+    <div class="dl">
+      <span class="lbl">Lane</span><span>${s.o} → ${s.d} · ${s.dist.toLocaleString()} km</span>
+      <span class="lbl">Mode / carrier</span><span><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span> ${esc(s.carrier)}</span>
+      <span class="lbl">Commodity</span><span>${s.commodity} (HS ${s.hs}) · ${esc(s.customer)}</span>
+      <span class="lbl">Incoterm</span><span>${s.incoterm} — ${inc?inc.name:''}</span>
+      <span class="lbl">ETD / ETA</span><span>${s.etd} → ${s.eta}</span>
+      <span class="lbl">Predicted ETA</span><span style="color:${parseD(s.predEta)>parseD(s.eta)?'var(--warn)':'var(--good)'}">${s.predEta}</span>
+      <span class="lbl">Disruption risk</span><span>${riskBadge(s.risk)} ${s.exc?'· '+esc(s.exc):''}</span>
+      <span class="lbl">Weight / value</span><span>${s.weightKg.toLocaleString()} kg · ${f$(s.value)}</span>
+      <span class="lbl">Should-cost / inv.</span><span>${f$(s.should)} / ${f$(s.invoiced)} ${s.invoiced>s.should*1.08?'<span class="pill rag-r">overpriced</span>':'<span class="pill rag-g">fair</span>'}</span>
+      <span class="lbl">D&D</span><span>${s.dndDays>0?s.dndDays+' days · '+f$(s.dndCost):'none'}</span>
+      <span class="lbl">CO₂</span><span>${s.co2.toLocaleString()} kg</span>
+    </div>
+    <label style="margin-top:12px">Update status</label>
+    <select id="ctStatusSel">${['At Origin','In Transit','Customs Hold','Delayed','Exception','Delivered'].map(o=>`<option ${o===s.status?'selected':''}>${o}</option>`).join('')}</select>
+    <div class="row" style="margin-top:12px">
+      <button class="mini go" data-act="reroute" data-id="${s.id}">↪ Reroute</button>
+      <button class="mini" data-act="switch" data-id="${s.id}">🔁 Switch carrier</button>
+      <button class="mini" data-act="dnd" data-id="${s.id}">📝 D&D dispute</button>
+      <button class="mini" id="ctAsk">🤖 Ask copilot</button>
+    </div>`;
+  $('ctStatusSel').onchange=e=>{s.status=e.target.value;toast(`${id} → ${s.status}`);renderControl();};
+  $('ctDetail').querySelectorAll('button[data-act]').forEach(b=>b.onclick=()=>{excAction(b.dataset.act,b.dataset.id);$('ctModal').classList.remove('show');});
+  $('ctAsk').onclick=()=>{$('ctModal').classList.remove('show');ask(`Explain shipment ${s.id} (${s.o}→${s.d}, ${s.mode}, ${s.carrier}), its ${s.risk} risk score and what I should do.`);};
+  $('ctModal').classList.add('show');}
+
+function renderControl(){ctKpiCards();renderInbox();renderCTTable();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));}
+
+/* control tower wiring */
+function ctExportRows(){return SHIPMENTS.map(s=>({ID:s.id,Origin:s.o,Destination:s.d,Mode:s.mode,Carrier:s.carrier,Commodity:s.commodity,HS:s.hs,Customer:s.customer,Incoterm:s.incoterm,ETD:s.etd,ETA:s.eta,PredictedETA:s.predEta,Status:s.status,RiskScore:s.risk,DistanceKm:s.dist,WeightKg:s.weightKg,Value:s.value,ShouldCost:s.should,Invoiced:s.invoiced,DnD_Cost:s.dndCost,CO2_kg:s.co2,Exception:s.exc||''}));}
+function wireControl(){
+  ['ctSearch','ctMode','ctStatus','ctCarrier'].forEach(id=>$(id).oninput=renderCTTable);
+  $('ctCarrier').innerHTML='<option value="">All carriers</option>'+CARRIERS.map(c=>`<option>${c.name}</option>`).join('');
+  $('ctClose').onclick=()=>$('ctModal').classList.remove('show');
+  $('ctExport').onclick=()=>{exportXlsx('logictics_shipments.xlsx',[{name:'Shipments',rows:ctExportRows()}]);toast('Exported shipments to Excel.');};
+  $('ctTemplate').onclick=()=>{exportXlsx('shipments_template.xlsx',[{name:'Shipments',rows:[{ID:'SHP-2001',Origin:'Shanghai',Destination:'Los Angeles',Mode:'Ocean',Carrier:'Maersk',Commodity:'Electronics',Incoterm:'FOB',ETD:'2026-06-01',ETA:'2026-06-22',Status:'In Transit',WeightKg:18000,Invoiced:9800}]}]);toast('Template downloaded.');};
+  $('ctImportBtn').onclick=()=>$('ctFile').click();
+  $('ctFile').onchange=e=>{const f=e.target.files[0];if(!f)return;importXlsx(f,rows=>{if(!rows.length){toast('No rows found.');return;}
+    SHIPMENTS=rows.map((r,i)=>{const o=COORD[r.Origin]||{name:r.Origin,lat:0,lon:0},d=COORD[r.Destination]||{name:r.Destination,lat:0,lon:0};const mode=r.Mode||'Ocean';const dist=Math.round(r.DistanceKm||haversine(o,d));const wk=+r.WeightKg||10000;const should=Math.round(r.ShouldCost||shouldCost({dist,mode,weightKg:wk,fuel:18,acc:300,dray:mode==='Ocean'?600:0}));
+      return{id:r.ID||('IMP-'+i),o:r.Origin,d:r.Destination,oc:o,dc:d,mode,carrier:r.Carrier||'—',commodity:r.Commodity||'General',hs:r.HS||'',customer:r.Customer||'—',incoterm:r.Incoterm||'FOB',dist,weightKg:wk,value:+r.Value||wk*10,etd:r.ETD||dstr(TODAY),eta:r.ETA||dstr(addDays(TODAY,20)),predEta:r.PredictedETA||r.ETA||dstr(addDays(TODAY,22)),actualDelivery:r.Status==='Delivered'?(r.ETA||dstr(TODAY)):null,slaTarget:25,planned:20,status:r.Status||'In Transit',onTime:r.Status==='Delivered',inFull:true,risk:+r.RiskScore||25,co2:+r.CO2_kg||Math.round(dist*wk/1000*MODESPEED[mode].co2/1000),should,invoiced:Math.round(r.Invoiced||should),freeDays:5,daysUsed:0,dndDays:0,dndCost:+r.DnD_Cost||0,exc:r.Exception||null,revenue:Math.round((r.Invoiced||should)*1.3)};});
+    toast(`Imported ${SHIPMENTS.length} shipments.`);renderControl();renderPerf&&renderPerf();renderCost&&renderCost();});};
+}
+
+/* =========================================================================
+   PERFORMANCE & CARRIERS
+   ========================================================================= */
+function carrierStats(){const map={};
+  SHIPMENTS.forEach(s=>{const c=map[s.carrier]=map[s.carrier]||{name:s.carrier,mode:s.mode,n:0,deliv:0,ot:0,cost:0,mi:0,risk:0};c.n++;c.cost+=s.invoiced;c.mi+=s.dist*KM_MI;c.risk+=s.risk;if(s.status==='Delivered'){c.deliv++;if(s.onTime)c.ot++;}});
+  return Object.values(map).map(c=>{const ref=CARRIERS.find(r=>r.name===c.name)||{tender:.93,dmg:.006,cpm:2.5,rel:.9};
+    const otd=c.deliv?c.ot/c.deliv*100:ref.rel*100;const cpm=c.mi?c.cost/c.mi:ref.cpm;const grade=otd>=95&&ref.dmg<.006?'A':otd>=92?'B':otd>=86?'C':'D';
+    return Object.assign(c,{ref,otd,cpm,grade,avgRisk:Math.round(c.risk/c.n)});}).sort((a,b)=>b.otd-a.otd);}
+const gradeCol=g=>({A:'rag-g',B:'rag-g',C:'rag-a',D:'rag-r'}[g]||'rag-n');
+
+function modalShiftRecs(){const recs=[],seen={};
+  SHIPMENTS.forEach(s=>{if(!['Air','Road'].includes(s.mode))return;const key=s.o+'>'+s.d;if(seen[key])return;seen[key]=1;
+    const alt=s.mode==='Air'?(s.dist>2500?'Ocean':'Rail'):'Rail';const ams=MODESPEED[alt];
+    const altTransit=Math.round(s.dist/ams.kmday)+ams.buf;
+    const altCo2=Math.round(s.dist*(s.weightKg/1000)*ams.co2/1000);
+    const altCost=Math.round(shouldCost({dist:s.dist,mode:alt,weightKg:s.weightKg,fuel:18,acc:300,dray:alt==='Ocean'?600:0}));
+    recs.push({lane:s.o+' → '+s.d,from:s.mode,to:alt,altTransit,sla:s.slaTarget,co2Save:s.co2-altCo2,costSave:s.should-altCost,fits:altTransit<=s.slaTarget});});
+  return recs.sort((a,b)=>(b.fits-a.fits)||(b.co2Save-a.co2Save)).slice(0,7);}
+
+function renderPerf(){
+  const dv=delivered();const ws=weeklySeries();
+  const otif=avg(dv.map(s=>(s.onTime&&s.inFull)?100:0)),otd=avg(dv.map(s=>s.onTime?100:0));
+  const fill=avg(dv.map(s=>s.inFull?100:0)),lt=avg(dv.map(s=>s.planned));
+  const cps=avg(SHIPMENTS.map(s=>s.invoiced));const cs=carrierStats();
+  const dmg=avg(cs.map(c=>c.ref.dmg*100)),tender=avg(cs.map(c=>c.ref.tender*100));
+  const perfect=otif*0.97;
+  const rag=(v,t)=>v>=t?'rg':v>=t-7?'ra':'rr';
+  const cards=[
+    {k:'OTIF',v:pct(otif),c:rag(otif,95),s:'on-time in-full · tgt 95%',sp:sparkSVG(ws.otif,'#34d399')},
+    {k:'On-time delivery',v:pct(otd),c:rag(otd,95),s:'tgt 95%',sp:sparkSVG(ws.otd,'#22d3ee')},
+    {k:'Fill rate',v:pct(fill),c:rag(fill,97),s:'order completeness'},
+    {k:'Perfect order',v:pct(perfect),c:rag(perfect,90),s:'OTIF × doc accuracy'},
+    {k:'Avg lead time',v:f1(lt)+' d',c:'rb',s:'door-to-door'},
+    {k:'Avg cost / shipment',v:f$(cps),c:'rb',s:SHIPMENTS.length+' shipments'},
+    {k:'Tender acceptance',v:pct(tender),c:rag(tender,95),s:'carrier avg'},
+    {k:'Damage rate',v:pct(dmg),c:dmg<.6?'rg':dmg<1?'ra':'rr',s:'lower is better'}
+  ];
+  $('kpiCards').innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="sub2">${c.s}</div>${c.sp||''}</div>`).join('');
+  // charts
+  mkChart('chOtif',{type:'line',data:{labels:ws.labels,datasets:[
+    {label:'OTD %',data:ws.otd,borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.1)',tension:.3,fill:true},
+    {label:'OTIF %',data:ws.otif,borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.08)',tension:.3,fill:true}]},
+    options:{scales:{y:{min:60,max:100,ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom'}}}});
+  mkChart('chSla',{type:'bar',data:{labels:cs.map(c=>c.name),datasets:[
+    {label:'OTD %',data:cs.map(c=>Math.round(c.otd)),backgroundColor:cs.map(c=>c.otd>=95?'#34d399':c.otd>=90?'#fbbf24':'#f87171')},
+    {type:'line',label:'Target 95%',data:cs.map(()=>95),borderColor:'#22d3ee',borderDash:[5,4],pointRadius:0}]},
+    options:{indexAxis:'y',scales:{x:{min:70,max:100,ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom'}}}});
+  const co2map={};SHIPMENTS.forEach(s=>co2map[s.mode]=(co2map[s.mode]||0)+s.co2);
+  mkChart('chCo2',{type:'doughnut',data:{labels:Object.keys(co2map),datasets:[{data:Object.values(co2map),backgroundColor:Object.keys(co2map).map(m=>MODECOL[m])}]},options:{plugins:{legend:{position:'right'},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)+' kg CO₂'}}}}});
+  // carrier scorecard
+  $('carrierBody').innerHTML=cs.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td><span class="modetag" style="background:${MODECOL[c.mode]}">${c.mode}</span></td><td class="num">${c.n}</td><td class="num">${pct(c.otd)}</td><td class="num">${pct(c.ref.tender*100)}</td><td class="num">${pct(c.ref.dmg*100)}</td><td class="num">$${f1(c.cpm)}</td><td class="num">${c.avgRisk}</td><td><span class="grade ${gradeCol(c.grade)}">${c.grade}</span></td></tr>`).join('');
+  // modal shift
+  const recs=modalShiftRecs();
+  $('modalShift').innerHTML=`<table><thead><tr><th>Lane</th><th>Shift</th><th class="num">Transit vs SLA</th><th class="num">CO₂ saved</th><th class="num">$ saved</th><th></th></tr></thead><tbody>${recs.map(r=>`<tr><td>${r.lane}</td><td><span class="modetag" style="background:${MODECOL[r.from]}">${r.from}</span> → <span class="modetag" style="background:${MODECOL[r.to]}">${r.to}</span></td><td class="num">${r.altTransit}/${r.sla} d</td><td class="num">${r.co2Save>0?fmt(r.co2Save)+' kg':'—'}</td><td class="num">${r.costSave>0?f$(r.costSave):'—'}</td><td>${r.fits?'<span class="pill rag-g">✓ fits SLA</span>':'<span class="pill rag-a">tight</span>'}</td></tr>`).join('')}</tbody></table>`;
+  // SLA detail
+  $('slaBody').innerHTML=cs.map(c=>{const tgt=95,va=c.otd-tgt;return `<tr><td>${esc(c.name)}</td><td class="num">${c.deliv}</td><td class="num">${c.ot}</td><td class="num">${pct(c.otd)}</td><td class="num">${tgt}%</td><td class="num" style="color:${va>=0?'var(--good)':'var(--bad)'}">${va>=0?'+':''}${f1(va)}</td><td><span class="pill ${va>=0?'rag-g':va>=-5?'rag-a':'rag-r'}">${va>=0?'meets':va>=-5?'watch':'breach'}</span></td></tr>`;}).join('');
+}
+
+/* =========================================================================
+   COST INTELLIGENCE
+   ========================================================================= */
 const MODES=[
-  {m:'Truck (road)',rate:0.13,kmday:800,scope:['domestic','import','export'],liquids:false,color:'#3b82f6',best:'Flexible, door-to-door, short/medium haul'},
+  {m:'Truck (road)',rate:0.13,kmday:800,scope:['domestic','import','export'],liquids:false,color:'#fbbf24',best:'Flexible, door-to-door, short/medium haul'},
   {m:'Rail',rate:0.045,kmday:650,scope:['domestic','import','export'],liquids:false,color:'#34d399',best:'Heavy bulk over land, low cost'},
   {m:'Ocean (container)',rate:0.025,kmday:650,scope:['import','export'],liquids:false,color:'#22d3ee',best:'Cheapest for intl bulk/containers'},
-  {m:'Air',rate:0.45,kmday:6500,scope:['domestic','import','export'],liquids:false,color:'#fbbf24',best:'Fastest; high-value, time-critical'},
+  {m:'Air',rate:0.45,kmday:6500,scope:['domestic','import','export'],liquids:false,color:'#a78bfa',best:'Fastest; high-value, time-critical'},
   {m:'Pipeline',rate:0.008,kmday:1500,scope:['domestic','export'],liquids:true,color:'#f87171',best:'Liquids/gas only — cheapest by far'}
 ];
 const FF=[['Ocean/air freight',42,'#22d3ee'],['Customs duties & tariffs',18,'#fbbf24'],['Port & terminal',12,'#3b82f6'],['Drayage & last-mile',11,'#34d399'],['Brokerage & docs',7,'#a78bfa'],['Cargo insurance',5,'#f472b6'],['Forwarder margin',5,'#64748b']];
-
-function bars(el,data){const max=Math.max(...data.map(d=>d[1]));$(el).innerHTML=data.map(([n,v,c])=>`<div class="splitbar"><div class="name">${n}</div><div class="track"><div class="fill" style="width:${v/max*100}%;background:${c}">${v}%</div></div></div>`).join('');}
-function renderCommodity(){$('commodityAccordion').innerHTML=COMMODITY.map((g,i)=>`<details ${i===0?'open':''}><summary>${g.cat}</summary><div class="body"><table><tbody>${g.items.map(([a,b])=>`<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</tbody></table></div></details>`).join('');}
-function kpiGrid(id,arr){$(id).innerHTML=arr.map(([k,v,u])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');}
-function fillCommodity(){const flat=[];COMMODITY.forEach(g=>g.items.forEach(it=>flat.push(it[0])));$('cCommodity').innerHTML=flat.map(c=>`<option>${c}</option>`).join('');}
-function isLiquid(c){return /crude|refined|lng|gas|chemical/i.test(c);}
+function bars(el,data){const max=Math.max(...data.map(d=>d[1]));$(el).innerHTML=data.map(([n,v,c])=>`<div class="splitbar"><div class="name">${n}</div><div class="track"><div class="fill" style="width:${Math.max(5,v/max*100)}%;background:${c}">${v}%</div></div></div>`).join('');}
+function fillCommodity(){const opts=COMMODITIES.map(c=>`<option>${c.name}</option>`).join('');$('cCommodity').innerHTML=opts;$('lcCommodity').innerHTML=opts;
+  $('lcInco').innerHTML=INCOTERMS.map(i=>`<option value="${i.code}">${i.code} — ${i.name}</option>`).join('');$('lcInco').value='CIF';
+  const lanes=[...new Set(LANES.map(l=>l[0]+' → '+l[1]))];$('smcLane').innerHTML=lanes.map(l=>`<option>${l}</option>`).join('');}
+function isLiquid(c){return /crude|chemical/i.test(c);}
 function runCost(){const c=$('cCommodity').value,w=+$('cWeight').value,dist=+$('cDist').value,scope=$('cScope').value,exp=$('cExpedite').checked,liquid=isLiquid(c);
   let rows=MODES.filter(m=>m.scope.includes(scope)&&(!m.liquids||liquid)).map(m=>{let cost=m.rate*w*(dist/1000);let days=dist/m.kmday+(m.m.startsWith('Ocean')?4:m.m==='Air'?1:0.5);if(exp){if(m.m==='Air'){cost*=1.9;days*=0.6;}else{cost*=1.4;days*=0.8;}}return{m:m.m,color:m.color,cost,days,best:m.best};});
   const minC=Math.min(...rows.map(r=>r.cost)),minD=Math.min(...rows.map(r=>r.days));rows.sort((a,b)=>a.cost-b.cost);
-  $('costResult').innerHTML=`<table><thead><tr><th>Mode</th><th class="num">Total cost</th><th class="num">$/kg</th><th class="num">Transit</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="modetag" style="background:${r.color}">${r.m}</span></td><td class="num ${r.cost===minC?'best':''}">$${Math.round(r.cost).toLocaleString()}</td><td class="num">$${(r.cost/w).toFixed(2)}</td><td class="num ${Math.abs(r.days-minD)<.01?'best':''}">${r.days.toFixed(1)} d</td><td class="hint">${r.best}</td></tr>`).join('')}</tbody></table><div class="src">Cheapest: <b class="best">${rows[0].m}</b> $${Math.round(rows[0].cost).toLocaleString()}. Fastest: <b>${rows.slice().sort((a,b)=>a.days-b.days)[0].m}</b>. Planning estimate.</div>`;
-  S.cost={commodity:c,scope,cheapest:rows[0].m};}
-function renderModeRef(){$('modeRef').innerHTML=MODES.map(m=>`<tr><td><span class="modetag" style="background:${m.color}">${m.m}</span></td><td class="num">$${m.rate.toFixed(3)}</td><td class="num">${m.kmday.toLocaleString()} km/d</td><td class="hint">${m.best}</td></tr>`).join('');}
+  $('costResult').innerHTML=`<table><thead><tr><th>Mode</th><th class="num">Total cost</th><th class="num">$/kg</th><th class="num">Transit</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="modetag" style="background:${r.color}">${r.m}</span></td><td class="num ${r.cost===minC?'best':''}">${f$(r.cost)}</td><td class="num">$${(r.cost/w).toFixed(2)}</td><td class="num ${Math.abs(r.days-minD)<.01?'best':''}">${r.days.toFixed(1)} d</td><td class="hint">${r.best}</td></tr>`).join('')}</tbody></table><div class="src">Cheapest: <b class="best">${rows[0].m}</b> ${f$(rows[0].cost)}. Fastest: <b>${rows.slice().sort((a,b)=>a.days-b.days)[0].m}</b>. Planning estimate.</div>`;}
 
-/* ===================== ROUTE SANDBOX (synthetic) ===================== */
-const W=800,H=460,PAD=36;const NS='http://www.w3.org/2000/svg';
-function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function laneAgg(){const map={};SHIPMENTS.forEach(s=>{const k=s.o+' → '+s.d+'|'+s.mode;const a=map[k]=map[k]||{lane:s.o+' → '+s.d,mode:s.mode,should:0,inv:0,n:0};a.should+=s.should;a.inv+=s.invoiced;a.n++;});return Object.values(map).map(a=>Object.assign(a,{va:a.inv-a.should,pc:(a.inv-a.should)/a.should*100})).sort((x,y)=>y.va-x.va);}
+function ctsAgg(dim){const key=dim==='lane'?(s=>s.o+' → '+s.d):dim;const map={};SHIPMENTS.forEach(s=>{const k=typeof key==='function'?key(s):s[key];const a=map[k]=map[k]||{name:k,rev:0,cost:0,n:0};a.rev+=s.revenue;a.cost+=s.invoiced+s.dndCost;a.n++;});return Object.values(map).map(a=>Object.assign(a,{margin:a.rev-a.cost,mpc:a.rev?(a.rev-a.cost)/a.rev*100:0})).sort((x,y)=>x.margin-y.margin);}
+
+function smcCompute(){const lane=$('smcLane').value.split(' → ');const o=COORD[lane[0]],d=COORD[lane[1]];const dist=o&&d?Math.round(haversine(o,d)):8000;
+  const mode=$('smcMode').value||'Ocean',w=+$('smcWeight').value||1,fuel=+$('smcFuel').value,acc=+$('smcAcc').value,dray=+$('smcDray').value;
+  const ms=MODESPEED[mode];const lineHaul=ms.base*w*(dist/1000);const fuelAmt=lineHaul*fuel/100;const should=lineHaul+fuelAmt+acc+dray;
+  const inv=$('smcInvoiced').value!==''?+$('smcInvoiced').value:null;
+  const comps=[['Line haul',lineHaul,'#3b82f6'],['Fuel surcharge',fuelAmt,'#fbbf24'],['Accessorials',acc,'#a78bfa'],['Drayage',dray,'#34d399']];
+  const max=Math.max(...comps.map(c=>c[1]));
+  let verdict='';
+  if(inv!=null){const va=inv-should,pcv=va/should*100;verdict=`<div class="kpi ${pcv>8?'rr':pcv<-2?'rg':'ra'}" style="margin-top:12px"><div class="k">Invoice audit — ${lane[0]} → ${lane[1]} (${mode})</div><div class="v">${f$(inv)} invoiced vs ${f$(should)} should-cost</div><div class="sub2">Variance ${va>=0?'+':''}${f$(va)} (${pcv>=0?'+':''}${f1(pcv)}%) — ${pcv>8?'⚑ overpriced, audit this lane':pcv<-2?'✓ below benchmark':'within tolerance'}</div></div>`;}
+  $('smcResult').innerHTML=`<div class="grid2"><div><div class="kpi rb"><div class="k">Model should-cost · ${dist.toLocaleString()} km</div><div class="v">${f$(should)}</div><div class="sub2">$${(should/w).toFixed(2)}/kg · ${mode}</div></div></div>
+    <div>${comps.map(c=>`<div class="splitbar"><div class="name">${c[0]}</div><div class="track"><div class="fill" style="width:${Math.max(5,c[1]/max*100)}%;background:${c[2]}">${f$(c[1])}</div></div></div>`).join('')}</div></div>${verdict}`;}
+
+function runLanded(){const com=COM[$('lcCommodity').value]||COMMODITIES[0],val=+$('lcValue').value,inc=INC[$('lcInco').value]||INC.CIF,fr=+$('lcFreight').value,ins=+$('lcIns').value;
+  const dutyR=$('lcDuty').value!==''?+$('lcDuty').value/100:com.duty;const vat=+$('lcVat').value/100,fees=+$('lcFees').value;
+  const dutiable=val+fr+ins;const duty=dutiable*dutyR;const vatAmt=(dutiable+duty)*vat;const landed=val+fr+ins+duty+vatAmt+fees;
+  const comps=[['Goods (FOB)',val,'#3b82f6'],['Freight',fr,'#22d3ee'],['Insurance',ins,'#34d399'],['Duty ('+(dutyR*100).toFixed(1)+'%)',duty,'#fbbf24'],['VAT/GST',vatAmt,'#a78bfa'],['Brokerage & fees',fees,'#f472b6']];const max=Math.max(...comps.map(c=>c[1]));
+  const sellerPays=inc.code==='DDP'?'incl. duty & taxes':inc.freight==='S'?'freight (not import duty)':'goods only';
+  $('landedResult').innerHTML=`<div class="grid2"><div><div class="kpi rb"><div class="k">Total landed cost</div><div class="v">${f$(landed)}</div><div class="sub2">${f1(landed/val*100-100)}% over goods value · duty basis = CIF (${f$(dutiable)})</div></div>
+    <div class="hint" style="margin-top:10px">Under <b>${inc.code}</b>, the seller covers ${sellerPays}; remaining costs fall to the buyer. ${com.duty===0?'This HS line is duty-free in many markets.':''}</div></div>
+    <div>${comps.map(c=>`<div class="splitbar"><div class="name">${c[0]}</div><div class="track"><div class="fill" style="width:${Math.max(4,c[1]/max*100)}%;background:${c[2]}">${f$(c[1])}</div></div></div>`).join('')}</div></div>`;
+  incoBoxRender(inc.code);}
+function incoBoxRender(code){const i=INC[code];const deliver=['DAP','DPU','DDP'].includes(code)?'S':'B';const unload=code==='DPU'?'S':'B';
+  const stages=[['Export packing','S'],['Export customs',i.exp],['Main carriage / freight',i.freight],['Insurance',i.ins==='—'?'·':i.ins[0]],['Import customs & duty',i.imp],['Delivery to door',deliver],['Unload at destination',unload]];
+  const cell=v=>v==='S'?'<span class="resp-S">Seller</span>':v==='B'?'<span class="resp-B">Buyer</span>':'<span style="color:var(--muted)">—</span>';
+  $('incoBox').innerHTML=`<div class="grid2"><div>
+    <div style="font-weight:700;margin-bottom:6px">${i.code} — ${i.name} <span class="tag">${i.mode} mode</span></div>
+    <div class="hint" style="margin-bottom:8px">${i.use}</div>
+    <div class="risktrack"><div class="sellzone" style="width:${i.risk}%"></div><div class="mark" style="left:${i.risk}%" data-l="risk →"></div></div>
+    <div class="rtlabels"><span>Seller bears risk</span><span>Buyer bears risk</span></div>
+    <div class="hint" style="margin-top:6px">Risk transfers: <b style="color:var(--txt)">${i.riskTxt}</b></div></div>
+    <div><table class="matrix"><tbody>${stages.map(s=>`<tr><td>${s[0]}</td><td style="text-align:right">${cell(s[1])}</td></tr>`).join('')}</tbody></table></div></div>`;}
+
+function renderCost(){
+  const spend=SHIPMENTS.reduce((a,s)=>a+s.invoiced,0),should=SHIPMENTS.reduce((a,s)=>a+s.should,0);
+  const over=SHIPMENTS.reduce((a,s)=>a+Math.max(0,s.invoiced-s.should),0);const la=laneAgg();const flagged=la.filter(l=>l.pc>8).length;
+  const dnd=SHIPMENTS.reduce((a,s)=>a+s.dndCost,0);const cts=ctsAgg('customer');const lossN=cts.filter(c=>c.margin<0).length;const avgM=avg(cts.map(c=>c.mpc));
+  const cards=[
+    {k:'Freight spend',v:f$(spend),c:'rb',s:'invoiced, all lanes'},
+    {k:'Should-cost baseline',v:f$(should),c:'rb',s:'model-based'},
+    {k:'Overspend vs should',v:f$(over),c:over>spend*0.05?'rr':'ra',s:f1(over/should*100)+'% above benchmark'},
+    {k:'Lanes flagged',v:flagged,c:flagged>3?'rr':'ra',s:'> +8% over should-cost'},
+    {k:'D&D leakage',v:f$(dnd),c:'ra',s:'detention + demurrage'},
+    {k:'Avg customer margin',v:pct(avgM),c:avgM<10?'rr':avgM<20?'ra':'rg',s:'cost-to-serve'},
+    {k:'Loss-making accounts',v:lossN,c:lossN>0?'rr':'rg',s:'negative margin'},
+    {k:'Recoverable',v:f$(over*0.6+dnd*0.7),c:'rg',s:'audit + D&D upside'}
+  ];
+  $('costKpis').innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="sub2">${c.s}</div></div>`).join('');
+  // invoice audit table
+  $('smcBody').innerHTML=la.map(l=>`<tr><td>${l.lane}</td><td><span class="modetag" style="background:${MODECOL[l.mode]}">${l.mode}</span></td><td class="num">${f$(l.should)}</td><td class="num">${f$(l.inv)}</td><td class="num" style="color:${l.va>0?'var(--bad)':'var(--good)'}">${l.va>=0?'+':''}${f$(l.va)}</td><td class="num">${l.pc>=0?'+':''}${f1(l.pc)}%</td><td>${l.pc>8?'<span class="pill rag-r">⚑ audit</span>':l.pc<0?'<span class="pill rag-g">good</span>':'<span class="pill rag-a">ok</span>'}</td></tr>`).join('');
+  // D&D
+  const dndShip=SHIPMENTS.filter(s=>s.dndDays>0).sort((a,b)=>b.dndCost-a.dndCost);
+  $('dndKpis').innerHTML=[['Total D&D leak',f$(dnd),'rr'],['Shipments affected',dndShip.length,'ra'],['Avg per event',f$(dndShip.length?dnd/dndShip.length:0),'ra'],['% of freight spend',f1(dnd/spend*100)+'%','ra']].map(c=>`<div class="kpi ${c[2]}"><div class="k">${c[0]}</div><div class="v">${c[1]}</div></div>`).join('');
+  $('dndBody').innerHTML=dndShip.slice(0,12).map(s=>`<tr><td><b>${s.id}</b></td><td>${s.d}</td><td class="num">${s.freeDays}</td><td class="num">${s.daysUsed}</td><td class="num" style="color:var(--bad)">${f$(s.dndCost)}</td><td><span class="pill ${s.dndDays>3?'rag-r':'rag-a'}">${s.dndDays}d over</span></td></tr>`).join('')||'<tr><td colspan="6" class="hint">No active detention or demurrage. ✓</td></tr>';
+  renderCts('customer');
+  runCost();
+  $('lcInco').value=$('lcInco').value||'CIF';incoBoxRender($('lcInco').value);
+}
+function renderCts(dim){const data=ctsAgg(dim).slice(0,9);$('ctsDimHead').textContent=dim.charAt(0).toUpperCase()+dim.slice(1);
+  mkChart('chCts',{type:'bar',data:{labels:data.map(d=>d.name),datasets:[{label:'Margin $',data:data.map(d=>Math.round(d.margin)),backgroundColor:data.map(d=>d.margin<0?'#f87171':'#34d399')}]},options:{indexAxis:'y',plugins:{legend:{display:false}}}});
+  $('ctsBody').innerHTML=data.map(d=>`<tr><td>${esc(d.name)}</td><td class="num">${f$(d.rev)}</td><td class="num">${f$(d.cost)}</td><td class="num" style="color:${d.margin<0?'var(--bad)':'var(--good)'}">${f$(d.margin)}</td><td class="num">${f1(d.mpc)}%</td></tr>`).join('');}
+
+/* =========================================================================
+   OPTIMIZATION STUDIO — constraint solver
+   ========================================================================= */
+const OPT_TEMPLATES={
+ modemix:{title:'Mode & load optimization — minimize freight cost',sense:'min',
+   desc:'Move 1,000 units across ocean / air / rail at least cost, honoring lane caps and a minimum urgent volume by air.',
+   vars:[{name:'Ocean',desc:'units via ocean',obj:6,lo:0,hi:700},{name:'Air',desc:'units via air',obj:22,lo:0,hi:400},{name:'Rail',desc:'units via rail',obj:9,lo:0,hi:500}],
+   cons:[{name:'Meet demand',c:[1,1,1],sense:'>=',rhs:1000},{name:'Urgent via air',c:[0,1,0],sense:'>=',rhs:150}]},
+ transport:{title:'Transportation / min-cost network flow',sense:'min',
+   desc:'Ship from 2 plants (supply) to 3 DCs (demand) at minimum total cost — the classic OR transportation problem.',
+   vars:[{name:'P1D1',desc:'Plant1→DC1',obj:8,lo:0,hi:1e9},{name:'P1D2',desc:'Plant1→DC2',obj:6,lo:0,hi:1e9},{name:'P1D3',desc:'Plant1→DC3',obj:10,lo:0,hi:1e9},{name:'P2D1',desc:'Plant2→DC1',obj:9,lo:0,hi:1e9},{name:'P2D2',desc:'Plant2→DC2',obj:7,lo:0,hi:1e9},{name:'P2D3',desc:'Plant2→DC3',obj:4,lo:0,hi:1e9}],
+   cons:[{name:'Plant 1 supply',c:[1,1,1,0,0,0],sense:'<=',rhs:500},{name:'Plant 2 supply',c:[0,0,0,1,1,1],sense:'<=',rhs:400},{name:'DC1 demand',c:[1,0,0,1,0,0],sense:'>=',rhs:300},{name:'DC2 demand',c:[0,1,0,0,1,0],sense:'>=',rhs:350},{name:'DC3 demand',c:[0,0,1,0,0,1],sense:'>=',rhs:250}]},
+ margin:{title:'Contract / freight mix — maximize margin',sense:'max',
+   desc:'Pick the profit-max mix of two haul contracts sharing limited truck-hours and dock-hours.',
+   vars:[{name:'Contract_A',desc:'loads of A',obj:40,lo:0,hi:1e9},{name:'Contract_B',desc:'loads of B',obj:55,lo:0,hi:40}],
+   cons:[{name:'Truck hours',c:[2,3],sense:'<=',rhs:180},{name:'Dock hours',c:[1,1],sense:'<=',rhs:80}]},
+ consol:{title:'Consolidation & cube utilization — minimize cost',sense:'min',
+   desc:'Move 2,400 cbm via FTL / LTL / parcel at least cost, with FTL availability, a parcel cap and an urgent-parcel minimum.',
+   vars:[{name:'FTL',desc:'cbm full truckload',obj:15,lo:0,hi:1800},{name:'LTL',desc:'cbm less-than-TL',obj:28,lo:0,hi:1e9},{name:'Parcel',desc:'cbm parcel',obj:45,lo:0,hi:200}],
+   cons:[{name:'Move volume',c:[1,1,1],sense:'>=',rhs:2400},{name:'Urgent parcel min',c:[0,0,1],sense:'>=',rhs:80}]},
+ blank:{title:'Blank model',sense:'max',desc:'Build your own: add variables and constraints.',
+   vars:[{name:'x1',desc:'',obj:1,lo:0,hi:1e9},{name:'x2',desc:'',obj:1,lo:0,hi:1e9}],cons:[{name:'C1',c:[1,1],sense:'<=',rhs:10}]}
+};
+let OPT=JSON.parse(JSON.stringify(OPT_TEMPLATES.modemix)),OPTRES=null;
+const hiStr=h=>(h>=1e8?'':h);
+function loadTemplate(k){OPT=JSON.parse(JSON.stringify(OPT_TEMPLATES[k]));$('objSense').value=OPT.sense;$('optDesc').innerHTML='<b>'+esc(OPT.title)+'</b> — '+esc(OPT.desc);renderBuilder();solveOpt();}
+function renderBuilder(){
+  $('varBody').innerHTML=OPT.vars.map((v,i)=>`<tr>
+    <td><input class="miniip" style="width:90px" data-v="${i}" data-f="name" value="${esc(v.name)}"></td>
+    <td><input data-v="${i}" data-f="desc" value="${esc(v.desc||'')}" style="width:150px"></td>
+    <td class="num"><input class="miniip" data-v="${i}" data-f="obj" type="number" value="${v.obj}"></td>
+    <td class="num"><input class="miniip" data-v="${i}" data-f="lo" type="number" value="${v.lo}"></td>
+    <td class="num"><input class="miniip" data-v="${i}" data-f="hi" type="number" value="${hiStr(v.hi)}" placeholder="∞"></td>
+    <td><span class="ibtn" data-delv="${i}">✕</span></td></tr>`).join('');
+  $('conBody').innerHTML=OPT.cons.map((c,i)=>`<tr>
+    <td><input class="miniip" style="width:110px" data-cn="${i}" value="${esc(c.name)}"></td>
+    <td><div style="display:flex;gap:6px;flex-wrap:wrap">${OPT.vars.map((v,j)=>`<span style="display:inline-flex;align-items:center;gap:3px"><span class="tag">${esc(v.name)}</span><input class="miniip" style="width:54px" data-cc="${i}" data-cv="${j}" type="number" value="${c.c[j]||0}"></span>`).join('')}</div></td>
+    <td><select class="miniip" style="width:54px" data-cs="${i}"><option ${c.sense==='<='?'selected':''}>&le;</option><option ${c.sense==='='?'selected':''}>=</option><option ${c.sense==='>='?'selected':''}>&ge;</option></select></td>
+    <td class="num"><input class="miniip" data-cr="${i}" type="number" value="${c.rhs}"></td>
+    <td><span class="ibtn" data-delc="${i}">✕</span></td></tr>`).join('');
+  $('varBody').querySelectorAll('[data-delv]').forEach(b=>b.onclick=()=>{readBuilder();const i=+b.dataset.delv;OPT.vars.splice(i,1);OPT.cons.forEach(c=>c.c.splice(i,1));renderBuilder();});
+  $('conBody').querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{readBuilder();OPT.cons.splice(+b.dataset.delc,1);renderBuilder();});
+}
+const qv=s=>{const e=document.querySelector(s);return e?e.value:'';};
+function readBuilder(){OPT.sense=$('objSense').value;
+  OPT.vars.forEach((v,i)=>{v.name=qv(`[data-v="${i}"][data-f="name"]`)||v.name;v.desc=qv(`[data-v="${i}"][data-f="desc"]`);v.obj=+qv(`[data-v="${i}"][data-f="obj"]`)||0;v.lo=+qv(`[data-v="${i}"][data-f="lo"]`)||0;const h=qv(`[data-v="${i}"][data-f="hi"]`);v.hi=h===''?1e9:+h;});
+  OPT.cons.forEach((c,i)=>{c.name=qv(`[data-cn="${i}"]`)||c.name;c.c=OPT.vars.map((_,j)=>+qv(`[data-cc="${i}"][data-cv="${j}"]`)||0);const s=qv(`[data-cs="${i}"]`);c.sense=s.includes('≤')||s==='≤'?'<=':s.includes('≥')||s==='≥'?'>=':s==='='?'=':(c.sense||'<=');c.rhs=+qv(`[data-cr="${i}"]`)||0;});}
+function solveOpt(){readBuilder();
+  const model={sense:OPT.sense,vars:OPT.vars.map(v=>({name:v.name,obj:v.obj,lo:v.lo,hi:v.hi})),cons:OPT.cons.map(c=>({name:c.name,coef:Object.fromEntries(OPT.vars.map((v,j)=>[v.name,c.c[j]])),sense:c.sense,rhs:c.rhs}))};
+  const res=solveLP(model);OPTRES=res;
+  if(res.status!=='optimal'){$('optResult').innerHTML=`<div class="kpi rr"><div class="k">No optimal solution</div><div class="v" style="font-size:16px">${res.status.toUpperCase()}</div><div class="sub2">${res.status==='infeasible'?'Constraints conflict — relax a bound or RHS.':'Objective is unbounded — add a limiting constraint.'}</div></div>`;$('optSens').innerHTML='';if(CHARTS.chOpt)CHARTS.chOpt.destroy();return;}
+  const used=res.vars.filter(v=>v.value>1e-6);
+  $('optResult').innerHTML=`<div class="kpi rg"><div class="k">Optimal objective (${OPT.sense})</div><div class="v">${f$(res.objective).replace('$',OPT.sense==='max'?'$':'$')}</div></div>
+    <table style="margin-top:10px"><thead><tr><th>Variable</th><th>Description</th><th class="num">Value</th></tr></thead><tbody>${res.vars.map(v=>{const d=(OPT.vars.find(x=>x.name===v.name)||{}).desc||'';return `<tr><td><b>${esc(v.name)}</b></td><td class="hint">${esc(d)}</td><td class="num ${v.value>1e-6?'best':''}">${f1(v.value)}</td></tr>`;}).join('')}</tbody></table>
+    <div class="hint" style="margin-top:8px">Recommendation: ${used.length?used.map(v=>`<b>${esc(v.name)} = ${f1(v.value)}</b>`).join(', '):'do nothing'}.</div>`;
+  mkChart('chOpt',{type:'bar',data:{labels:res.vars.map(v=>v.name),datasets:[{label:'Optimal value',data:res.vars.map(v=>Math.round(v.value*100)/100),backgroundColor:res.vars.map((_,i)=>CC[i%CC.length])}]},options:{plugins:{legend:{display:false}}}});
+  renderSens(res);$('optAI').innerHTML='';
+}
+function renderSens(res){
+  const vt=`<h2 style="margin:4px 0 8px">Decision variables</h2><div style="overflow:auto"><table><thead><tr><th>Variable</th><th class="num">Final value</th><th class="num">Reduced cost</th><th class="num">Obj coeff</th><th class="num">Allow. ↑</th><th class="num">Allow. ↓</th></tr></thead><tbody>${res.vars.map(v=>{const oc=(OPT.vars.find(x=>x.name===v.name)||{}).obj;return `<tr><td><b>${esc(v.name)}</b></td><td class="num">${f1(v.value)}</td><td class="num">${f1(v.rc)}</td><td class="num">${oc}</td><td class="num">${rng(v.objInc)}</td><td class="num">${rng(v.objDec)}</td></tr>`;}).join('')}</tbody></table></div>`;
+  const ct=`<h2 style="margin:14px 0 8px">Constraints <span class="sub">shadow price = Δobjective per unit of RHS</span></h2><div style="overflow:auto"><table><thead><tr><th>Constraint</th><th class="num">Final LHS</th><th class="num">RHS</th><th>Status</th><th class="num">Shadow price</th><th class="num">Allow. ↑</th><th class="num">Allow. ↓</th></tr></thead><tbody>${res.constraints.map(c=>`<tr><td>${esc(c.name)}${c.bound?' <span class="tag">bound</span>':''}</td><td class="num">${f1(c.lhs)}</td><td class="num">${f1(c.rhs)}</td><td>${c.binding?'<span class="pill rag-a">binding</span>':'<span class="pill rag-g">slack '+f1(c.slack)+'</span>'}</td><td class="num ${Math.abs(c.shadow)>1e-6?'best':''}">${f1(c.shadow)}</td><td class="num">${rng(c.rhsInc)}</td><td class="num">${rng(c.rhsDec)}</td></tr>`).join('')}</tbody></table></div>`;
+  $('optSens').innerHTML=vt+ct;
+}
+function interpretSolution(){if(!OPTRES||OPTRES.status!=='optimal'){$('optAI').innerHTML='<div class="hint">Solve a feasible model first.</div>';return;}
+  const r=OPTRES;const used=r.vars.filter(v=>v.value>1e-6);
+  const binds=r.constraints.filter(c=>c.binding&&Math.abs(c.shadow)>1e-6&&!c.bound).sort((a,b)=>Math.abs(b.shadow)-Math.abs(a.shadow));
+  const idle=r.vars.filter(v=>v.value<1e-6&&Math.abs(v.rc)>1e-6);
+  let h=`<div class="kpi rb"><div class="k">AI interpretation</div><div class="sub2" style="font-size:12px;color:var(--txt);margin-top:6px">`;
+  h+=`The optimal plan is to ${used.map(v=>`set <b>${esc(v.name)} = ${f1(v.value)}</b>`).join(', ')||'take no action'}, giving an objective of <b>${f$(r.objective)}</b> (${OPT.sense}). `;
+  if(binds.length){const top=binds[0];h+=`The binding bottleneck is <b>${esc(top.name)}</b> with a shadow price of <b>${f1(top.shadow)}</b> — one more unit of its RHS would ${OPT.sense==='max'?'improve':'change'} the objective by ${f1(Math.abs(top.shadow))}, valid up to +${rng(top.rhsInc)} / −${rng(top.rhsDec)}. Invest there first. `;
+    if(binds[1])h+=`Next is <b>${esc(binds[1].name)}</b> (shadow ${f1(binds[1].shadow)}). `;}
+  else h+=`No constraint is economically binding — you have slack everywhere. `;
+  if(idle.length)h+=`${idle.map(v=>esc(v.name)).join(', ')} stay at zero because their reduced cost (${idle.map(v=>f1(v.rc)).join(', ')}) makes them uncompetitive at current coefficients. `;
+  h+=`</div></div>`;
+  $('optAI').innerHTML=h;
+  if(localStorage.getItem('lo_key'))ask('Interpret this optimization result and recommend next actions: '+JSON.stringify({sense:OPT.sense,objective:Math.round(r.objective),plan:used.map(v=>v.name+'='+Math.round(v.value)),binding:binds.map(c=>c.name+' (shadow '+f1(c.shadow)+')')}));
+}
+function exportOptXlsx(){if(!OPTRES||OPTRES.status!=='optimal'){toast('Solve a feasible model first.');return;}readBuilder();const r=OPTRES;
+  const model=[['Objective sense',OPT.sense],[],['Variable','Description','Obj coeff','Lower','Upper'],...OPT.vars.map(v=>[v.name,v.desc,v.obj,v.lo,v.hi>=1e8?'inf':v.hi]),[],['Constraint',...OPT.vars.map(v=>v.name),'Sense','RHS'],...OPT.cons.map(c=>[c.name,...c.c,c.sense,c.rhs])];
+  const answer=[['ANSWER REPORT — Zumar\'s Logic-tics Stop'],['Objective ('+OPT.sense+')',Math.round(r.objective*1000)/1000],[],['Variable cells'],['Name','Final value'],...r.vars.map(v=>[v.name,Math.round(v.value*1000)/1000]),[],['Constraints'],['Name','Final LHS','RHS','Status','Slack'],...r.constraints.map(c=>[c.name,Math.round(c.lhs*1000)/1000,c.rhs,c.binding?'Binding':'Not binding',Math.round(c.slack*1000)/1000])];
+  const sens=[['SENSITIVITY REPORT — Zumar\'s Logic-tics Stop'],[],['Variable cells'],['Name','Final value','Reduced cost','Objective coeff','Allowable increase','Allowable decrease'],...r.vars.map(v=>{const oc=(OPT.vars.find(x=>x.name===v.name)||{}).obj;return [v.name,Math.round(v.value*1000)/1000,Math.round(v.rc*1000)/1000,oc,v.objInc>1e6?'1E+30':Math.round(v.objInc*1000)/1000,v.objDec>1e6?'1E+30':Math.round(v.objDec*1000)/1000];}),[],['Constraints'],['Name','Final value','Shadow price','RHS','Allowable increase','Allowable decrease'],...r.constraints.map(c=>[c.name,Math.round(c.lhs*1000)/1000,Math.round(c.shadow*1000)/1000,c.rhs,c.rhsInc>1e6?'1E+30':Math.round(c.rhsInc*1000)/1000,c.rhsDec>1e6?'1E+30':Math.round(c.rhsDec*1000)/1000])];
+  exportXlsx('optimization_report.xlsx',[{name:'Model',rows:model},{name:'Answer Report',rows:answer},{name:'Sensitivity Report',rows:sens}]);
+  toast('Exported model + Answer + Sensitivity to Excel.');}
+function wireOpt(){
+  $('optTemplate').innerHTML=Object.entries({modemix:'Mode & load optimization',transport:'Transportation / network flow',margin:'Contract / freight mix (max margin)',consol:'Consolidation & cube utilization',blank:'Blank model'}).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  $('optTemplate').onchange=e=>loadTemplate(e.target.value);
+  $('optSolve').onclick=solveOpt;$('objSense').onchange=()=>{readBuilder();};
+  $('addVar').onclick=()=>{readBuilder();OPT.vars.push({name:'x'+(OPT.vars.length+1),desc:'',obj:1,lo:0,hi:1e9});OPT.cons.forEach(c=>c.c.push(0));renderBuilder();};
+  $('addCon').onclick=()=>{readBuilder();OPT.cons.push({name:'C'+(OPT.cons.length+1),c:OPT.vars.map(()=>0),sense:'<=',rhs:0});renderBuilder();};
+  $('optExport').onclick=exportOptXlsx;$('optInterpret').onclick=interpretSolution;
+  document.querySelectorAll('#optSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#optSeg button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('opt-solver').style.display=b.dataset.sub==='solver'?'block':'none';$('opt-routing').style.display=b.dataset.sub==='routing'?'block':'none';});
+}
+
+/* =========================================================================
+   OPTIMIZATION STUDIO — routing & network (visual)
+   ========================================================================= */
+const W=800,H=460,PAD=36,NS='http://www.w3.org/2000/svg';
+function svel(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
 function gp(n){const p=[];for(let i=0;i<n;i++)p.push({x:rnd(PAD,W-PAD),y:rnd(PAD,H-PAD),demand:Math.round(rnd(5,25))});return p;}
 function dd(a,b){return Math.hypot(a.x-b.x,a.y-b.y)/8;}
 function rlen(o,p){let d=0;for(let i=0;i<o.length-1;i++)d+=dd(p[o[i]],p[o[i+1]]);return d;}
-function nn2(p,s=0){const n=p.length,seen=Array(n).fill(false),o=[s];seen[s]=true;for(let k=1;k<n;k++){let l=o[o.length-1],b=-1,bd=1e9;for(let j=0;j<n;j++)if(!seen[j]){const d=dd(p[l],p[j]);if(d<bd){bd=d;b=j;}}o.push(b);seen[b]=true;}o.push(s);return o;}
+function nn2(p,s){s=s||0;const n=p.length,seen=Array(n).fill(false),o=[s];seen[s]=true;for(let k=1;k<n;k++){let l=o[o.length-1],b=-1,bd=1e9;for(let j=0;j<n;j++)if(!seen[j]){const d=dd(p[l],p[j]);if(d<bd){bd=d;b=j;}}o.push(b);seen[b]=true;}o.push(s);return o;}
 function topt(o,p){let imp=true,best=o.slice();while(imp){imp=false;for(let i=1;i<best.length-2;i++)for(let k=i+1;k<best.length-1;k++){const a=p[best[i-1]],b=p[best[i]],c=p[best[k]],d=p[best[k+1]];if(dd(a,b)+dd(c,d)>dd(a,c)+dd(b,d)+1e-9){best=best.slice(0,i).concat(best.slice(i,k+1).reverse(),best.slice(k+1));imp=true;}}}return best;}
 function rorder(p){const o=p.map((_,i)=>i);for(let i=o.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[o[i],o[j]]=[o[j],o[i]];}o.push(o[0]);return o;}
 const PAL=['#3b82f6','#22d3ee','#a78bfa','#34d399','#fbbf24','#f87171','#f472b6','#60a5fa'];
-function mg(){const g=$('map');g.innerHTML='';for(let x=PAD;x<=W-PAD;x+=70)g.appendChild(el('line',{x1:x,y1:PAD,x2:x,y2:H-PAD,stroke:'#16212f','stroke-width':1}));for(let y=PAD;y<=H-PAD;y+=70)g.appendChild(el('line',{x1:PAD,y1:y,x2:W-PAD,y2:y,stroke:'#16212f','stroke-width':1}));}
-function mnode(p,r,f){$('map').appendChild(el('circle',{cx:p.x,cy:p.y,r:r,fill:f,stroke:'#08111c','stroke-width':2}));}
-function mline(a,b,c,w){$('map').appendChild(el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:c,'stroke-width':w||2.6,'stroke-opacity':.9,'stroke-linecap':'round'}));}
-const S={cost:null};
-function oKpi(distKm){const cost=distKm*1.85,time=distKm/55,ot=Math.max(60,Math.min(99,Math.round(100-time*2.5)));kpiGrid('oKpis',[['Distance',distKm.toFixed(1),'km'],['Cost','$'+cost.toFixed(0),''],['Time',time.toFixed(1),'h'],['On-time',ot,'%']]);}
-function oBars(cmp){const max=Math.max(...Object.values(cmp));$('oBars').innerHTML=['Random','Greedy','2-opt'].map(k=>`<div class="splitbar"><div class="name">${k}</div><div class="track"><div class="fill" style="width:${cmp[k]/max*100}%;background:${k==='2-opt'?'var(--good)':'var(--accent)'}">${cmp[k].toFixed(0)}</div></div></div>`).join('');}
-function solveSandbox(){const problem=$('problem').value,n=+$('n').value,strat=$('strategy').value;mg();
+function mg(){const g=$('map');g.innerHTML='';for(let x=PAD;x<=W-PAD;x+=70)g.appendChild(svel('line',{x1:x,y1:PAD,x2:x,y2:H-PAD,stroke:'#16212f','stroke-width':1}));for(let y=PAD;y<=H-PAD;y+=70)g.appendChild(svel('line',{x1:PAD,y1:y,x2:W-PAD,y2:y,stroke:'#16212f','stroke-width':1}));}
+function mnode(p,r,f){$('map').appendChild(svel('circle',{cx:p.x,cy:p.y,r:r,fill:f,stroke:'#08111c','stroke-width':2}));}
+function mline(a,b,c,w){$('map').appendChild(svel('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:c,'stroke-width':w||2.6,'stroke-opacity':.9,'stroke-linecap':'round'}));}
+function mtext(p,t,c){const e=svel('text',{x:p.x,y:p.y-9,fill:c||'#f87171','font-size':13,'font-weight':700,'text-anchor':'middle'});e.textContent=t;$('map').appendChild(e);}
+function kpiGrid(id,arr){$(id).innerHTML=arr.map(([k,v,u])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v} <small>${u||''}</small></div></div>`).join('');}
+function oKpi(distKm){const cost=distKm*1.85,time=distKm/55,ot=Math.max(60,Math.min(99,Math.round(100-time*2.5)));kpiGrid('oKpis',[['Distance',distKm.toFixed(1),'km'],['Cost','$'+cost.toFixed(0),''],['Time',time.toFixed(1),'h'],['Service',ot,'%']]);}
+function oBars(cmp){const max=Math.max(...Object.values(cmp));$('oBars').innerHTML=Object.keys(cmp).map(k=>`<div class="splitbar"><div class="name">${k}</div><div class="track"><div class="fill" style="width:${cmp[k]/max*100}%;background:${k==='2-opt'||k==='Rerouted'?'var(--good)':'var(--accent)'}">${cmp[k].toFixed(0)}</div></div></div>`).join('');}
+function solveSandbox(){const problem=$('problem').value,n=+$('n').value,strat=$('strategy').value;mg();$('rlHead').textContent={tsp:'TSP route',vrp:'Vehicle routes',facility:'Facility location',network:'Min-cost flow',reroute:'Disruption re-routing'}[problem];
   if(problem==='tsp'){const p=gp(n);const nn=nn2(p,0),opt=topt(nn,p),ro=rorder(p);const cmp={Random:rlen(ro,p),Greedy:rlen(nn,p),'2-opt':rlen(opt,p)};const ord=strat==='random'?ro:strat==='nn'?nn:opt;for(let i=0;i<ord.length-1;i++)mline(p[ord[i]],p[ord[i+1]],'#3b82f6');p.forEach(pt=>mnode(pt,5,'var(--accent2)'));mnode(p[0],8,'var(--depot)');oKpi(rlen(ord,p));oBars(cmp);$('solveNote').innerHTML=`Visited <b>${n}</b> stops; 2-opt cut <b>${(100-cmp['2-opt']/cmp['Random']*100).toFixed(0)}%</b> vs random.`;}
   else if(problem==='vrp'){const depot={x:W/2,y:H/2};const p=gp(n),cap=+$('cap').value,nV=+$('v').value;const cust=p.map((c,i)=>({...c,i})).sort((a,b)=>Math.atan2(a.y-depot.y,a.x-depot.x)-Math.atan2(b.y-depot.y,b.x-depot.x));const routes=[];let cur=[],load=0;for(const c of cust){if(load+c.demand>cap||cur.length>=Math.ceil(cust.length/nV)+1){if(cur.length)routes.push(cur);cur=[];load=0;}cur.push(c);load+=c.demand;}if(cur.length)routes.push(cur);let total=0;routes.forEach((r,ri)=>{const loc=[depot,...r];let ord=topt(nn2(loc,0),loc);total+=rlen(ord,loc);for(let i=0;i<ord.length-1;i++)mline(loc[ord[i]],loc[ord[i+1]],PAL[ri%PAL.length]);});p.forEach(pt=>mnode(pt,4.5,'var(--accent2)'));mnode(depot,8,'var(--depot)');oKpi(total);oBars({Random:total*1.45,Greedy:total*1.12,'2-opt':total});$('solveNote').innerHTML=`Served <b>${n}</b> stops on <b>${routes.length}</b> route(s).`;}
   else if(problem==='facility'){const dem=gp(n),nf=+$('f').value,open=+$('o').value,sites=gp(nf);const chosen=[];const cand=sites.map((_,i)=>i);while(chosen.length<open&&cand.length){let best=-1,bc=1e18;for(const cd of cand){const test=[...chosen,cd];let cost=0;for(const d of dem){let m=1e9;for(const s of test)m=Math.min(m,dd(d,sites[s]));cost+=m*d.demand;}if(cost<bc){bc=cost;best=cd;}}chosen.push(best);cand.splice(cand.indexOf(best),1);}let total=0;dem.forEach(d=>{let m=1e9,w=chosen[0];for(const s of chosen){const x=dd(d,sites[s]);if(x<m){m=x;w=s;}}total+=m*d.demand;mline(d,sites[w],'#3b82f6',1.5);});dem.forEach(pt=>mnode(pt,4,'var(--accent2)'));sites.forEach((s,i)=>mnode(s,chosen.includes(i)?9:5,chosen.includes(i)?'var(--depot)':'#445'));total/=100;oKpi(total);oBars({Random:total*1.6,Greedy:total*1.18,'2-opt':total});$('solveNote').innerHTML=`Opened <b>${open}</b>/${nf} warehouses.`;}
-  else{const nS=Math.min(4,Math.max(2,Math.round(n/6))),nT=Math.min(8,Math.max(3,Math.round(n/3)));const src=[],snk=[];for(let i=0;i<nS;i++)src.push({x:rnd(PAD,PAD+150),y:rnd(PAD,H-PAD),supply:Math.round(rnd(40,90))});for(let i=0;i<nT;i++)snk.push({x:rnd(W-PAD-150,W-PAD),y:rnd(PAD,H-PAD),demand:Math.round(rnd(20,50))});let sup=src.map(s=>s.supply),dem=snk.map(s=>s.demand),cells=[],cost=0;src.forEach((s,i)=>snk.forEach((t,j)=>cells.push({i,j,c:dd(s,t)})));cells.sort((a,b)=>a.c-b.c);const fl=[];for(const c of cells){const q=Math.min(sup[c.i],dem[c.j]);if(q>0){sup[c.i]-=q;dem[c.j]-=q;cost+=q*c.c;fl.push({...c,q});}}const mq=Math.max(...fl.map(f=>f.q));fl.forEach(f=>mline(src[f.i],snk[f.j],'#22d3ee',1+4*f.q/mq));src.forEach(s=>mnode(s,9,'var(--depot)'));snk.forEach(t=>mnode(t,5,'var(--accent2)'));oKpi(cost/10);oBars({Random:cost/10*1.5,Greedy:cost/10*1.15,'2-opt':cost/10});$('solveNote').innerHTML=`Routed <b>${nS}</b> FCs → <b>${nT}</b> regions.`;}
+  else if(problem==='reroute'){const p=gp(n);const nb=+$('b').value;const blocked=new Set();let g=0;while(blocked.size<nb&&g++<50){const k=1+Math.floor(rnd(0,n-1));if(k!==0)blocked.add(k);}const baseOrd=topt(nn2(p,0),p);const baseLen=rlen(baseOrd,p);
+    // base (faded)
+    for(let i=0;i<baseOrd.length-1;i++)mline(p[baseOrd[i]],p[baseOrd[i+1]],'#334155',1.4);
+    const idx=p.map((_,i)=>i).filter(i=>!blocked.has(i));const sub=idx.map(i=>p[i]);const subOrd=topt(nn2(sub,0),sub);const reLen=rlen(subOrd,sub);
+    for(let i=0;i<subOrd.length-1;i++)mline(sub[subOrd[i]],sub[subOrd[i+1]],'#34d399',2.6);
+    p.forEach((pt,i)=>{if(blocked.has(i)){mnode(pt,6,'#f87171');mtext(pt,'✕');}else mnode(pt,5,'var(--accent2)');});mnode(p[0],8,'var(--depot)');
+    oKpi(reLen);oBars({'Original (blocked)':baseLen,'Rerouted':reLen});$('solveNote').innerHTML=`<b>${nb}</b> node(s) blocked (✕). Re-routed around the disruption serving <b>${idx.length-1}</b> reachable stops — recovery path in green vs original in grey.`;}
+  else{const nS=Math.min(4,Math.max(2,Math.round(n/6))),nT=Math.min(8,Math.max(3,Math.round(n/3)));const src=[],snk=[];for(let i=0;i<nS;i++)src.push({x:rnd(PAD,PAD+150),y:rnd(PAD,H-PAD),supply:Math.round(rnd(40,90))});for(let i=0;i<nT;i++)snk.push({x:rnd(W-PAD-150,W-PAD),y:rnd(PAD,H-PAD),demand:Math.round(rnd(20,50))});let sup=src.map(s=>s.supply),dem=snk.map(s=>s.demand),cells=[],cost=0;src.forEach((s,i)=>snk.forEach((t,j)=>cells.push({i,j,c:dd(s,t)})));cells.sort((a,b)=>a.c-b.c);const fl=[];for(const c of cells){const q=Math.min(sup[c.i],dem[c.j]);if(q>0){sup[c.i]-=q;dem[c.j]-=q;cost+=q*c.c;fl.push({...c,q});}}const mq=Math.max(...fl.map(f=>f.q));fl.forEach(f=>mline(src[f.i],snk[f.j],'#22d3ee',1+4*f.q/mq));src.forEach(s=>mnode(s,9,'var(--depot)'));snk.forEach(t=>mnode(t,5,'var(--accent2)'));oKpi(cost/10);oBars({Random:cost/10*1.5,Greedy:cost/10*1.15,'2-opt':cost/10});$('solveNote').innerHTML=`Routed <b>${nS}</b> sources → <b>${nT}</b> sinks at min cost.`;}
+}
+function wireRouting(){
+  ['n','v','cap','f','o','b'].forEach(id=>{const L={n:'nLbl',v:'vLbl',cap:'capLbl',f:'fLbl',o:'oLbl',b:'bLbl'}[id];const el=$(id);if(el)el.oninput=e=>{const lab=$(L);if(lab)lab.textContent=e.target.value;};});
+  $('problem').onchange=e=>{const p=e.target.value;$('vrpControls').style.display=p==='vrp'?'block':'none';$('facControls').style.display=p==='facility'?'block':'none';$('rrControls').style.display=p==='reroute'?'block':'none';};
+  $('solveBtn').onclick=solveSandbox;
 }
 
-/* ===================== AI CHAT ===================== */
+/* =========================================================================
+   GLOBAL — world route & hub planner  (Leaflet)
+   ========================================================================= */
+const PLANMODES={road:{rate:1.8,speed:65,co2:62,color:'#fbbf24',label:'Road / Truck'},air:{rate:6.5,speed:800,co2:500,color:'#a78bfa',label:'Air'},ocean:{rate:0.5,speed:35,co2:10,color:'#22d3ee',label:'Ocean'},rail:{rate:0.9,speed:60,co2:22,color:'#34d399',label:'Rail'}};
+const EXAMPLE_ROUTE=["Houston","Rotterdam","Singapore","Ningbo","Yokohama"];
+const EXAMPLE_HUBS=["Los Angeles","Chicago","New York","Dallas","Atlanta","Miami","Seattle","Denver"];
+let wmap,layerGroup,locations=[],planMode='route';
+const KPIVIS={distance:true,cost:true,time:true,co2:true,legs:true},CARDVIS={centroid:true,mode:true};
+function initMap(){wmap=L.map('worldmap',{worldCopyJump:true,minZoom:2}).setView([25,15],2);L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(wmap);layerGroup=L.layerGroup().addTo(wmap);}
+let acSel=-1,acMatches=[];
+function searchCities(q){q=q.toLowerCase().trim();if(!q)return[];return CITIES.filter(c=>c[0].toLowerCase().includes(q)||c[1].toLowerCase().includes(q)).slice(0,8);}
+function renderAC(q){acMatches=searchCities(q);acSel=-1;const box=$('aclist');if(!acMatches.length){box.classList.remove('show');box.innerHTML='';return;}box.innerHTML=acMatches.map((c,i)=>`<div class="acitem" data-i="${i}">${c[0]} <small>${c[1]}</small></div>`).join('');box.classList.add('show');box.querySelectorAll('.acitem').forEach(el=>el.onclick=()=>addLocation({name:acMatches[+el.dataset.i][0],country:acMatches[+el.dataset.i][1],lat:acMatches[+el.dataset.i][2],lon:acMatches[+el.dataset.i][3]}));}
+async function geocode(q){try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));const j=await r.json();if(j&&j.length)return{name:q,country:(j[0].display_name||'').split(',').slice(-1)[0].trim(),lat:+j[0].lat,lon:+j[0].lon};}catch(e){}return null;}
+function addLocation(loc){if(locations.find(l=>Math.abs(l.lat-loc.lat)<0.01&&Math.abs(l.lon-loc.lon)<0.01)){toast(loc.name+' already added.');return;}loc.role=locations.length===0?'origin':'stop';locations.push(loc);$('cityInput').value='';$('aclist').classList.remove('show');renderLocList();drawMarkers();if(wmap)wmap.panTo([loc.lat,loc.lon]);}
+function renderLocList(){$('loclist').innerHTML=locations.map((l,i)=>`<div class="locrow"><span class="role ${l.role}" data-i="${i}" title="Toggle origin/hub">${l.role==='origin'?'ORIGIN':'STOP'}</span><span class="nm">${l.name} <small>${l.country||''}</small></span><span class="x" data-x="${i}">✕</span></div>`).join('');$('loclist').querySelectorAll('.role').forEach(el=>el.onclick=()=>{const i=+el.dataset.i;if(planMode==='route'){locations.forEach((l,j)=>l.role=j===i?'origin':'stop');}else{locations[i].role=locations[i].role==='origin'?'stop':'origin';}renderLocList();drawMarkers();});$('loclist').querySelectorAll('.x').forEach(el=>el.onclick=()=>{locations.splice(+el.dataset.x,1);if(planMode==='route'&&locations.length&&!locations.find(l=>l.role==='origin'))locations[0].role='origin';renderLocList();drawMarkers();});}
+function drawMarkers(routeOrder,assign,chosen){if(!layerGroup)return;layerGroup.clearLayers();locations.forEach(l=>{const origin=l.role==='origin';L.circleMarker([l.lat,l.lon],{radius:origin?8:5,color:'#08111c',weight:2,fillColor:origin?'#f59e0b':'#22d3ee',fillOpacity:1}).addTo(layerGroup).bindPopup(`<b>${l.name}</b><br>${l.country||''}<br>${l.lat.toFixed(2)}, ${l.lon.toFixed(2)}`);});if(routeOrder){const col=PLANMODES[$('planMode').value].color;const pts=[];routeOrder.forEach((idx,k)=>{if(k>0)arcPts(locations[routeOrder[k-1]],locations[idx],32).forEach(p=>pts.push(p));});L.polyline(pts,{color:col,weight:3,opacity:.9}).addTo(layerGroup);}if(assign){assign.forEach(a=>L.polyline([[a.city.lat,a.city.lon],[a.hub.lat,a.hub.lon]],{color:'#3b82f6',weight:1.6,opacity:.6}).addTo(layerGroup));}if(locations.length){try{wmap.fitBounds(L.latLngBounds(locations.map(l=>[l.lat,l.lon])).pad(0.25));}catch(e){}}}
+function tspOrder(){const origin=locations.findIndex(l=>l.role==='origin');const start=origin<0?0:origin;const n=locations.length,seen=Array(n).fill(false),o=[start];seen[start]=true;for(let k=1;k<n;k++){let last=o[o.length-1],b=-1,bd=1e18;for(let j=0;j<n;j++)if(!seen[j]){const d=haversine(locations[last],locations[j]);if(d<bd){bd=d;b=j;}}o.push(b);seen[b]=true;}o.push(start);let imp=true;while(imp){imp=false;for(let i=1;i<o.length-2;i++)for(let k=i+1;k<o.length-1;k++){const A=locations[o[i-1]],B=locations[o[i]],C=locations[o[k]],D=locations[o[k+1]];if(haversine(A,B)+haversine(C,D)>haversine(A,C)+haversine(B,D)+1e-9){o.splice(i,k+1-i,...o.slice(i,k+1).reverse());imp=true;}}}return o;}
+function routeKm(o){let d=0;for(let i=0;i<o.length-1;i++)d+=haversine(locations[o[i]],locations[o[i+1]]);return d;}
+function hubSolve(k){const cands=locations.map((l,i)=>i).filter(i=>locations[i].role==='origin');const pool=cands.length?cands:locations.map((l,i)=>i);const chosen=[];let avail=pool.slice();while(chosen.length<Math.min(k,avail.length)){let best=-1,bc=1e18;for(const c of avail){if(chosen.includes(c))continue;const test=[...chosen,c];let cost=0;for(const d of locations){let m=1e18;for(const s of test)m=Math.min(m,haversine(d,locations[s]));cost+=m;}if(cost<bc){bc=cost;best=c;}}chosen.push(best);}const assign=locations.map(d=>{let m=1e18,w=chosen[0];for(const s of chosen){const x=haversine(d,locations[s]);if(x<m){m=x;w=s;}}return{city:d,hub:locations[w],dist:m};});const total=assign.reduce((a,x)=>a+x.dist,0);return{chosen,assign,total};}
+function centroid(){let x=0,y=0,z=0;locations.forEach(l=>{const la=l.lat*Math.PI/180,lo=l.lon*Math.PI/180;x+=Math.cos(la)*Math.cos(lo);y+=Math.cos(la)*Math.sin(lo);z+=Math.sin(la);});const n=locations.length;x/=n;y/=n;z/=n;const lon=Math.atan2(y,x),hyp=Math.sqrt(x*x+y*y),lat=Math.atan2(z,hyp);const c={lat:lat*180/Math.PI,lon:lon*180/Math.PI};let best=null,bd=1e18;CITIES.forEach(ci=>{const d=haversine(c,{lat:ci[2],lon:ci[3]});if(d<bd){bd=d;best=ci;}});return{c,nearest:best};}
+let PLAN={};
+function optimize(){if(locations.length<2){toast('Add at least 2 cities.');return;}if(planMode==='route'){const o=tspOrder();const km=routeKm(o);const m=PLANMODES[$('planMode').value];const cost=km*m.rate,hours=km/m.speed,co2=km*m.co2/1000;drawMarkers(o);let maxLeg=0,maxPair='';for(let i=0;i<o.length-1;i++){const d=haversine(locations[o[i]],locations[o[i+1]]);if(d>maxLeg){maxLeg=d;maxPair=locations[o[i]].name+' → '+locations[o[i+1]].name;}}PLAN={mode:'route',transport:m.label,km,cost,hours,co2,stops:locations.length,maxLeg,maxPair,order:o.map(i=>locations[i].name)};renderPlanKpis();renderInsights();$('planNote').innerHTML=`Optimized a <b>${locations.length}-city</b> ${m.label} route: <b>${fmt(km)} km</b>, ~${hours<48?hours.toFixed(1)+' h':(hours/24).toFixed(1)+' days'}.`;botSay(`Optimized your ${locations.length}-city ${m.label} route (TSP + 2-opt): ${fmt(km)} km, est. ${f$(cost)}, ~${(hours/24).toFixed(1)} days, ${fmt(co2)} kg CO₂. Longest leg: ${maxPair}.`);}else{const k=+$('kHub').value;const{chosen,assign,total}=hubSolve(k);drawMarkers(null,assign,chosen);chosen.forEach(ci=>{const l=locations[ci];L.circleMarker([l.lat,l.lon],{radius:9,color:'#08111c',weight:2,fillColor:'#f59e0b',fillOpacity:1}).addTo(layerGroup).bindPopup('<b>HUB: '+l.name+'</b>');});PLAN={mode:'hub',hubs:chosen.map(i=>locations[i].name),demand:locations.length,total};renderPlanKpis();renderInsights();$('planNote').innerHTML=`Opened <b>${chosen.length}</b> hub(s) — ${chosen.map(i=>locations[i].name).join(', ')} — serving <b>${locations.length}</b> cities at min total distance.`;botSay(`Hub designer opened ${chosen.length} hub(s): ${chosen.map(i=>locations[i].name).join(', ')}, serving ${locations.length} cities. Total weighted distance ${fmt(total)} km.`);}}
+function renderPlanKpis(){let cards=[];if(PLAN.mode==='route'){if(KPIVIS.distance)cards.push(['Total distance',fmt(PLAN.km),'km']);if(KPIVIS.cost)cards.push(['Est. cost',f$(PLAN.cost),'']);if(KPIVIS.time)cards.push(['Transit time',PLAN.hours<48?PLAN.hours.toFixed(1):(PLAN.hours/24).toFixed(1),PLAN.hours<48?'h':'days']);if(KPIVIS.co2)cards.push(['CO₂ (per ton)',fmt(PLAN.co2),'kg']);if(KPIVIS.legs)cards.push(['Stops',PLAN.stops,'']);}else{cards.push(['Hubs opened',PLAN.hubs.length,'']);cards.push(['Cities served',PLAN.demand,'']);cards.push(['Total distance',fmt(PLAN.total),'km']);cards.push(['Avg / city',fmt(PLAN.total/PLAN.demand),'km']);}$('planKpis').innerHTML=cards.map(([k,v,u])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');}
+function renderInsights(){let html='';if(PLAN.mode==='route'){if(KPIVIS.legs&&PLAN.maxPair)html+=`<details open><summary>Longest leg</summary><div class="body"><b>${PLAN.maxPair}</b> at ${fmt(PLAN.maxLeg)} km — the biggest single hop. Consider a consolidation stop or a different mode for this leg.</div></details>`;if(CARDVIS.mode){const alt=Object.entries(PLANMODES).map(([k,m])=>({k,cost:PLAN.km*m.rate,days:PLAN.km/m.speed/24,label:m.label})).sort((a,b)=>a.cost-b.cost);html+=`<details><summary>Mode recommendation</summary><div class="body">Cheapest for this distance: <b>${alt[0].label}</b> (~${f$(alt[0].cost)}, ${alt[0].days.toFixed(1)} d). Fastest: <b>${alt.slice().sort((a,b)=>a.days-b.days)[0].label}</b>. You're on <b>${PLAN.transport}</b>.</div></details>`;}if(CARDVIS.centroid){const cg=centroid();html+=`<details><summary>Center of gravity</summary><div class="body">The demand-weighted center of your cities sits near <b>${cg.nearest[0]}, ${cg.nearest[1]}</b>. A depot/DC there minimizes average outbound distance.</div></details>`;}}else{if(CARDVIS.centroid){const cg=centroid();html+=`<details open><summary>Center of gravity</summary><div class="body">Network centroid is near <b>${cg.nearest[0]}, ${cg.nearest[1]}</b> — a strong single-DC candidate to benchmark your multi-hub solution against.</div></details>`;}html+=`<details><summary>Assignment summary</summary><div class="body">Each city is served by its nearest open hub. Increase "Hubs to open" to cut average distance (diminishing returns), or mark specific cities as candidate hubs.</div></details>`;}$('planInsights').innerHTML=html;}
+function wirePlanner(){
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('active'));b.classList.add('active');planMode=b.dataset.mode;$('routeOpts').style.display=planMode==='route'?'block':'none';$('hubOpts').style.display=planMode==='hub'?'block':'none';$('mapHead').textContent=planMode==='route'?'Multi-city route planner':'Hub / facility designer';$('addHint').textContent=planMode==='route'?'Type to search; Enter to geocode. Mark one city as ORIGIN.':'Add demand cities; toggle some to ORIGIN as candidate hubs.';});
+  $('cityInput').oninput=e=>renderAC(e.target.value);
+  $('cityInput').onkeydown=async e=>{const items=$('aclist').querySelectorAll('.acitem');if(e.key==='ArrowDown'){acSel=Math.min(acSel+1,items.length-1);items.forEach((it,i)=>it.classList.toggle('sel',i===acSel));e.preventDefault();}else if(e.key==='ArrowUp'){acSel=Math.max(acSel-1,0);items.forEach((it,i)=>it.classList.toggle('sel',i===acSel));e.preventDefault();}else if(e.key==='Enter'){if(acSel>=0&&acMatches[acSel]){const c=acMatches[acSel];addLocation({name:c[0],country:c[1],lat:c[2],lon:c[3]});}else if(acMatches.length){const c=acMatches[0];addLocation({name:c[0],country:c[1],lat:c[2],lon:c[3]});}else{const q=e.target.value.trim();if(q){toast('Geocoding "'+q+'"…');const g=await geocode(q);if(g)addLocation(g);else toast('Could not find "'+q+'".');}}}};
+  document.addEventListener('click',e=>{if(!e.target.closest('.ac'))$('aclist').classList.remove('show');});
+  $('optimizeBtn').onclick=optimize;
+  $('clearBtn').onclick=()=>{locations=[];renderLocList();if(layerGroup)layerGroup.clearLayers();$('planKpis').innerHTML='';$('planInsights').innerHTML='';$('planNote').textContent='Add at least 2 cities, then press Optimize.';};
+  $('exampleBtn').onclick=()=>{locations=[];const names=planMode==='route'?EXAMPLE_ROUTE:EXAMPLE_HUBS;names.forEach(nm=>{const c=CITIES.find(x=>x[0]===nm);if(c)locations.push({name:c[0],country:c[1],lat:c[2],lon:c[3],role:'stop'});});if(locations.length)locations[0].role='origin';renderLocList();drawMarkers();optimize();};
+  $('customizeBtn').onclick=()=>{const p=$('customPanel');p.style.display=p.style.display==='none'?'block':'none';};
+  $('kHub').oninput=e=>$('kHubLbl').textContent=e.target.value;
+  document.querySelectorAll('#customPanel input').forEach(c=>c.onchange=()=>{const k=c.dataset.kpi,cd=c.dataset.card;if(k)KPIVIS[k]=c.checked;if(cd)CARDVIS[cd]=c.checked;if(PLAN.mode){renderPlanKpis();renderInsights();}});
+}
+
+/* =========================================================================
+   GLOBAL — crude shipping network
+   ========================================================================= */
+const OILTERMS=[{n:'Ras Tanura',lat:26.64,lon:50.16},{n:'Kharg Island',lat:29.23,lon:50.32},{n:'Basra',lat:29.7,lon:48.8},{n:'Fujairah',lat:25.12,lon:56.33},{n:'Bonny',lat:4.45,lon:7.17},{n:'Houston/Corpus',lat:27.8,lon:-97.4},{n:'Primorsk',lat:60.3,lon:28.6},{n:'Novorossiysk',lat:44.7,lon:37.8},{n:'Tupi (Santos)',lat:-25.0,lon:-43.0}];
+const OILHUBS=[{n:'Ningbo/Zhoushan',lat:29.87,lon:121.54},{n:'Singapore',lat:1.35,lon:103.82},{n:'Rotterdam',lat:51.92,lon:4.48},{n:'Yokohama',lat:35.44,lon:139.64},{n:'Ulsan',lat:35.5,lon:129.4},{n:'Jamnagar',lat:22.47,lon:70.06}];
+const CHOKES=[
+ {n:'Strait of Hormuz',lat:26.57,lon:56.25,v23:20.9,v24:20.0,risk:'High',note:'~20% of global oil; no easy bypass'},
+ {n:'Strait of Malacca',lat:2.9,lon:101.3,v23:24.0,v24:22.5,risk:'High',note:'Asia’s main artery; congestion & piracy'},
+ {n:'Suez Canal + SUMED',lat:30.4,lon:32.35,v23:8.8,v24:4.8,risk:'Elevated',note:'Red Sea diversions cut 2024 flow'},
+ {n:'Bab el-Mandeb',lat:12.6,lon:43.4,v23:9.3,v24:4.1,risk:'High',note:'Attacks diverted tankers around the Cape'},
+ {n:'Turkish Straits',lat:41.1,lon:29.1,v23:3.2,v24:3.0,risk:'Moderate',note:'Russian / Caspian crude'},
+ {n:'Danish Straits',lat:55.7,lon:12.7,v23:3.0,v24:3.0,risk:'Low',note:'Baltic exports'},
+ {n:'Panama Canal',lat:9.1,lon:-79.7,v23:1.0,v24:0.8,risk:'Moderate',note:'Drought draft limits'},
+ {n:'Cape of Good Hope',lat:-34.8,lon:20.0,v23:0,v24:0,risk:'Reroute',note:'Bypass for Suez/Bab (+~10–14 days)'}];
+const TANKERS=[{c:'ULCC',dwt:'320,000+',bbl:3000000,use:'Ultra long-haul (rare)'},{c:'VLCC',dwt:'200–320k',bbl:2000000,use:'AG→Asia/Europe mainline'},{c:'Suezmax',dwt:'120–200k',bbl:1000000,use:'Max laden Suez; W.Africa, Black Sea'},{c:'Aframax',dwt:'80–120k',bbl:700000,use:'Regional / short-haul'},{c:'Panamax/LR1',dwt:'55–80k',bbl:500000,use:'Products & small crude parcels'},{c:'MR',dwt:'25–55k',bbl:300000,use:'Refined products, coastal'}];
+const DAYRATE={ULCC:55000,VLCC:45000,Suezmax:38000,Aframax:32000,'Panamax/LR1':25000,MR:18000};
+const CRLANES=[
+ {n:'Ras Tanura → Ningbo (AG→China)',via:['Strait of Hormuz','Strait of Malacca'],wp:[[26.64,50.16],[26.57,56.25],[13,60],[6,80],[2.9,101.3],[10,112],[29.87,121.54]]},
+ {n:'Ras Tanura → Rotterdam (AG→Europe, Suez)',via:['Strait of Hormuz','Bab el-Mandeb','Suez Canal + SUMED'],wp:[[26.64,50.16],[26.57,56.25],[14,52],[12.6,43.4],[20,38],[30.4,32.35],[34,26],[37,10],[36,-5.5],[43,-9.5],[48,-6],[51.92,4.48]],
+   alt:[[26.64,50.16],[26.57,56.25],[12,62],[0,68],[-15,60],[-34.8,38],[-34.8,20],[-30,5],[0,-2],[20,-18],[40,-15],[48,-8],[51.92,4.48]]},
+ {n:'Bonny → Rotterdam (W.Africa→Europe)',via:[],wp:[[4.45,7.17],[0,2],[14,-18],[30,-13],[43,-11],[48,-6],[51.92,4.48]]},
+ {n:'Houston → Rotterdam (US Gulf→Europe)',via:[],wp:[[27.8,-97.4],[25,-82],[31,-70],[42,-38],[49,-12],[51.92,4.48]]},
+ {n:'Primorsk → Rotterdam (Baltic)',via:['Danish Straits'],wp:[[60.3,28.6],[59.5,22],[55.7,12.7],[56,7],[54,4],[51.92,4.48]]}];
+const riskClass=r=>({High:'rag-r',Elevated:'rag-a',Moderate:'rag-a',Low:'rag-g',Reroute:'rag-n'}[r]||'rag-n');
+let crudeMap,crLayers={};
+function initCrudeMap(){crudeMap=L.map('crudemap',{worldCopyJump:true,minZoom:2}).setView([22,55],2);L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:10}).addTo(crudeMap);['grat','base','choke','voyage'].forEach(k=>crLayers[k]=L.layerGroup().addTo(crudeMap));}
+function sqIcon(col){return L.divIcon({className:'',html:`<div style="width:11px;height:11px;background:${col};border:1.5px solid #08111c;border-radius:2px"></div>`,iconSize:[11,11]});}
+function drawGraticule(){crLayers.grat.clearLayers();if(!$('crGrat').checked)return;for(let lon=-180;lon<=180;lon+=30){const pts=[];for(let lat=-80;lat<=80;lat+=5)pts.push([lat,lon]);L.polyline(pts,{color:'#1b3a4b',weight:.7,opacity:.7}).addTo(crLayers.grat);L.marker([0,lon],{icon:L.divIcon({className:'',html:`<span style="color:#3a566b;font-size:9px">${lon}°</span>`,iconSize:[28,12]})}).addTo(crLayers.grat);}for(let lat=-60;lat<=80;lat+=30){const pts=[];for(let lon=-180;lon<=180;lon+=5)pts.push([lat,lon]);L.polyline(pts,{color:'#1b3a4b',weight:.7,opacity:.7}).addTo(crLayers.grat);}}
+function drawCrudeBase(){crLayers.base.clearLayers();OILTERMS.forEach(t=>L.marker([t.lat,t.lon],{icon:sqIcon('#f59e0b')}).addTo(crLayers.base).bindPopup(`<b>${t.n}</b><br>Export terminal`));OILHUBS.forEach(h=>L.marker([h.lat,h.lon],{icon:sqIcon('#34d399')}).addTo(crLayers.base).bindPopup(`<b>${h.n}</b><br>Refining / import hub`));}
+function drawChokes(){crLayers.choke.clearLayers();if(!$('crChoke').checked)return;CHOKES.forEach(c=>L.circleMarker([c.lat,c.lon],{radius:6,color:'#08111c',weight:1.5,fillColor:c.risk==='Reroute'?'#64748b':'#f87171',fillOpacity:.95}).addTo(crLayers.choke).bindPopup(`<b>${c.n}</b><br>2024: ${c.v24} Mb/d (2023: ${c.v23})<br>Risk: ${c.risk}<br>${c.note}`));}
+function voyageCalc(wp,cls){let km=0;for(let i=0;i<wp.length-1;i++)km+=haversine({lat:wp[i][0],lon:wp[i][1]},{lat:wp[i+1][0],lon:wp[i+1][1]});const nm=km*0.539957;const days=nm/(13.5*24);const t=TANKERS.find(x=>x.c===cls)||TANKERS[1];const bunkers=days*28000;const cost=(DAYRATE[cls]||45000)*days*1.85+bunkers;return{km,nm,days,cargo:t.bbl,cost,perBbl:cost/t.bbl};}
+function renderCrude(){const lane=CRLANES[+$('crLane').value]||CRLANES[0];const cls=$('crClass').value;const reroute=$('crReroute').checked&&lane.alt;
+  drawGraticule();drawCrudeBase();drawChokes();crLayers.voyage.clearLayers();
+  const wp=reroute?lane.alt:lane.wp;const pts=[];for(let i=0;i<wp.length-1;i++)arcPts({lat:wp[i][0],lon:wp[i][1]},{lat:wp[i+1][0],lon:wp[i+1][1]},20).forEach(p=>pts.push(p));
+  L.polyline(pts,{color:reroute?'#fbbf24':'#22d3ee',weight:3,opacity:.95}).addTo(crLayers.voyage);
+  L.circleMarker(wp[0],{radius:7,color:'#08111c',weight:2,fillColor:'#f59e0b',fillOpacity:1}).addTo(crLayers.voyage).bindPopup('Load: '+lane.n.split(' → ')[0]);
+  L.circleMarker(wp[wp.length-1],{radius:7,color:'#08111c',weight:2,fillColor:'#34d399',fillOpacity:1}).addTo(crLayers.voyage);
+  try{crudeMap.fitBounds(L.latLngBounds(pts).pad(0.2));}catch(e){}
+  const v=voyageCalc(wp,cls);const via=reroute?['Cape of Good Hope']:lane.via;
+  const maxRisk=via.map(n=>(CHOKES.find(c=>c.n===n)||{}).risk).filter(Boolean);
+  const riskLvl=maxRisk.includes('High')?'High':maxRisk.includes('Elevated')?'Elevated':maxRisk.length?'Moderate':'Low';
+  $('crKpis').innerHTML=[['Distance',fmt(v.nm)+' nm'],['Transit',f1(v.days)+' days'],['Cargo',fmt(v.cargo)+' bbl'],['Freight','$'+v.perBbl.toFixed(2)+'/bbl'],['Voyage cost',f$(v.cost)],['Route risk',riskLvl]].map(c=>`<div class="kpi"><div class="k">${c[0]}</div><div class="v" style="font-size:17px">${c[1]}</div></div>`).join('');
+  let ins=`<div class="hint">Chokepoints on route: ${via.length?via.map(n=>`<span class="pill ${riskClass((CHOKES.find(c=>c.n===n)||{}).risk)}">${n}</span>`).join(' '):'none (open ocean)'}.</div>`;
+  if(lane.alt){const va=voyageCalc(lane.wp,cls),vb=voyageCalc(lane.alt,cls);const dd=vb.days-va.days,dc=vb.cost-va.cost;ins+=`<div class="hint" style="margin-top:6px">${reroute?'↩ Cape reroute':'Suez routing'} active. Cape of Good Hope adds <b>~${f1(vb.days-va.days)} days</b> and <b>${f$(dc)}</b> vs Suez, but avoids Bab-el-Mandeb / Suez risk. Toggle to compare.</div>`;}
+  $('crInsight').innerHTML=ins;$('crHead').textContent=lane.n+(reroute?' · Cape reroute':'');}
+function renderCrudeTables(){$('chokeBody').innerHTML=CHOKES.map(c=>`<tr><td><b>${c.n}</b></td><td class="num">${c.v23||'—'}</td><td class="num">${c.v24||'—'}</td><td><span class="pill ${riskClass(c.risk)}">${c.risk}</span></td><td class="hint">${c.note}</td></tr>`).join('');$('tankerBody').innerHTML=TANKERS.map(t=>`<tr><td><b>${t.c}</b></td><td class="num">${t.dwt}</td><td class="num">${fmt(t.bbl)}</td><td class="hint">${t.use}</td></tr>`).join('');}
+function wireCrude(){$('crLane').innerHTML=CRLANES.map((l,i)=>`<option value="${i}">${l.n}</option>`).join('');$('crClass').innerHTML=TANKERS.map(t=>`<option ${t.c==='VLCC'?'selected':''}>${t.c}</option>`).join('');['crGrat','crChoke','crReroute'].forEach(id=>$(id).onchange=renderCrude);$('crGo').onclick=renderCrude;$('crAll').onclick=()=>{crLayers.voyage.clearLayers();drawGraticule();drawCrudeBase();drawChokes();CRLANES.forEach((l,i)=>{const pts=[];for(let j=0;j<l.wp.length-1;j++)arcPts({lat:l.wp[j][0],lon:l.wp[j][1]},{lat:l.wp[j+1][0],lon:l.wp[j+1][1]},16).forEach(p=>pts.push(p));L.polyline(pts,{color:CC[i%CC.length],weight:2,opacity:.8}).addTo(crLayers.voyage);});crudeMap.setView([22,55],2);toast('Showing all '+CRLANES.length+' crude lanes.');};renderCrudeTables();}
+function wireGlobal(){document.querySelectorAll('#globalSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#globalSeg button').forEach(x=>x.classList.remove('active'));b.classList.add('active');const sub=b.dataset.sub;$('global-planner').style.display=sub==='planner'?'block':'none';$('global-crude').style.display=sub==='crude'?'block':'none';if(sub==='planner'&&wmap)setTimeout(()=>wmap.invalidateSize(),50);if(sub==='crude'){if(!crudeMap){initCrudeMap();wireCrude();renderCrude();}setTimeout(()=>crudeMap.invalidateSize(),50);}});}
+
+/* =========================================================================
+   DATA & REPORTS
+   ========================================================================= */
+function gauss(){let u=0,v=0;while(u===0)u=sr();while(v===0)v=sr();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+let LEADTIME=[];
+function genLeadtime(){_seed=246813579;LEADTIME=[];LANES.slice(0,12).forEach(l=>{const o=COORD[l[0]],d=COORD[l[1]],dist=haversine(o,d),ms=MODESPEED[l[2]];const mean=Math.max(4,Math.round(dist/ms.kmday)+ms.buf);const sd=Math.max(1,Math.round(mean*(0.12+sr()*0.2)));const target=mean+Math.ceil(sd*0.8);const orders=sint(12,26);for(let k=0;k<orders;k++){let lt=Math.max(1,Math.round(mean+gauss()*sd));LEADTIME.push({supplier:l[0],lane:l[0]+' → '+l[1],commodity:l[3],mode:l[2],lt,target});}});}
+function stats(arr){if(!arr.length)return{n:0,mean:0,sd:0,p50:0,p90:0,min:0,max:0};const s=arr.slice().sort((a,b)=>a-b),n=s.length,mean=avg(s),sd=Math.sqrt(avg(s.map(x=>(x-mean)**2)));return{n,mean,sd,p50:s[Math.floor(n*0.5)],p90:s[Math.floor(n*0.9)],min:s[0],max:s[n-1]};}
+const CONNECTORS=[{n:'SAP S/4HANA',ic:'🟦',status:'Connected',sync:'today 06:00',rows:'EKKO/EKPO · 12,480 docs'},{n:'Oracle SCM',ic:'🟥',status:'Connected',sync:'today 05:30',rows:'PO/Shipments · 8,210'},{n:'NetSuite',ic:'🟩',status:'Idle',sync:'yesterday 22:00',rows:'IF/PO · 3,940'},{n:'Excel / CSV',ic:'📗',status:'Manual',sync:'on import',rows:'lead-time history'}];
+const connPill=s=>s==='Connected'?'rag-g':s==='Idle'?'rag-a':'rag-n';
+function renderConns(){$('connCards').innerHTML=CONNECTORS.map(c=>`<div class="conn"><div class="nm">${c.ic} ${c.n} <span class="pill ${connPill(c.status)}" style="margin-left:auto">${c.status}</span></div><div class="meta">Last sync: ${c.sync}<br>${c.rows}</div></div>`).join('');}
+function renderLead(){const all=LEADTIME.map(r=>r.lt);const st=stats(all);
+  const mn=st.min,mx=st.max,bins=Math.min(12,Math.max(6,mx-mn+1)),bw=Math.ceil((mx-mn+1)/bins);const hist=new Array(bins).fill(0),labels=[];for(let i=0;i<bins;i++)labels.push((mn+i*bw)+'–'+(mn+i*bw+bw-1));all.forEach(v=>{const b=Math.min(bins-1,Math.floor((v-mn)/bw));hist[b]++;});
+  mkChart('chLeadHist',{type:'bar',data:{labels,datasets:[{label:'Orders',data:hist,backgroundColor:'#3b82f6'}]},options:{plugins:{legend:{display:false},title:{display:true,text:'days'}}}});
+  $('leadStats').innerHTML=[['Avg lead time',f1(st.mean)+' d'],['Std dev (σ)',f1(st.sd)+' d'],['P50 / P90',st.p50+' / '+st.p90+' d'],['Range',st.min+'–'+st.max+' d']].map(c=>`<div class="kpi rb"><div class="k">${c[0]}</div><div class="v" style="font-size:17px">${c[1]}</div></div>`).join('');
+  const map={};LEADTIME.forEach(r=>{(map[r.lane]=map[r.lane]||{lane:r.lane,supplier:r.supplier,lts:[],ot:0}).lts.push(r.lt);if(r.lt<=r.target)map[r.lane].ot++;});
+  const rows=Object.values(map).map(m=>{const s=stats(m.lts);const otif=m.ot/m.lts.length*100;const grade=otif>=92&&s.sd<s.mean*0.2?'A':otif>=85?'B':otif>=75?'C':'D';return{...m,...s,otif,grade};}).sort((a,b)=>b.otif-a.otif);
+  $('supplierBody').innerHTML=rows.map(r=>`<tr><td>${r.lane}</td><td class="num">${r.n}</td><td class="num">${f1(r.mean)}</td><td class="num">${f1(r.sd)}</td><td class="num">${pct(r.otif)}</td><td><span class="grade ${gradeCol(r.grade)}">${r.grade}</span></td></tr>`).join('');}
+function runInventory(){const d=+$('ivDemand').value,z=+$('ivService').value,lt=+$('ivLt').value,sd=+$('ivSd').value;
+  const ss=Math.round(z*d*sd);const rop=Math.round(d*lt+ss);const cycle=Math.round(d*lt);const lvl=$('ivService').selectedOptions[0].text;
+  $('invResult').innerHTML=`<div class="grid4">
+    <div class="kpi rb"><div class="k">Safety stock</div><div class="v">${fmt(ss)}</div><div class="sub2">units buffer</div></div>
+    <div class="kpi rb"><div class="k">Reorder point</div><div class="v">${fmt(rop)}</div><div class="sub2">reorder when on-hand ≤ this</div></div>
+    <div class="kpi rb"><div class="k">Cycle / pipeline stock</div><div class="v">${fmt(cycle)}</div><div class="sub2">demand × lead time</div></div>
+    <div class="kpi rg"><div class="k">Service level</div><div class="v">${lvl}</div><div class="sub2">z = ${z}</div></div></div>
+    <div class="hint" style="margin-top:8px">Safety stock = z × demand × σ(lead time) = ${z} × ${d} × ${sd} = <b>${fmt(ss)}</b>. Reorder point = (demand × lead time) + safety stock. Higher lead-time variability (σ) is the main driver of buffer inventory — cutting σ is usually cheaper than holding more stock.</div>`;}
+
+/* report builder */
+const RP_DIMS={shipments:{Mode:s=>s.mode,Carrier:s=>s.carrier,Lane:s=>s.o+' → '+s.d,Commodity:s=>s.commodity,Incoterm:s=>s.incoterm,Status:s=>s.status,Customer:s=>s.customer,Month:s=>s.etd.slice(0,7)},
+  leadtime:{Supplier:r=>r.supplier,Lane:r=>r.lane,Commodity:r=>r.commodity,Mode:r=>r.mode}};
+const RP_MEAS={shipments:{'Count':g=>g.length,'Total freight $':g=>g.reduce((a,s)=>a+s.invoiced,0),'Avg freight $':g=>avg(g.map(s=>s.invoiced)),'Total weight (kg)':g=>g.reduce((a,s)=>a+s.weightKg,0),'Total value $':g=>g.reduce((a,s)=>a+s.value,0),'Avg risk':g=>avg(g.map(s=>s.risk)),'OTD %':g=>{const d=g.filter(s=>s.status==='Delivered');return d.length?avg(d.map(s=>s.onTime?100:0)):0;},'Total CO₂ (kg)':g=>g.reduce((a,s)=>a+s.co2,0),'Total D&D $':g=>g.reduce((a,s)=>a+s.dndCost,0),'Avg margin $':g=>avg(g.map(s=>s.revenue-s.invoiced-s.dndCost))},
+  leadtime:{'Count':g=>g.length,'Avg lead time':g=>avg(g.map(r=>r.lt)),'σ lead time':g=>stats(g.map(r=>r.lt)).sd,'Max lead time':g=>Math.max(...g.map(r=>r.lt)),'OTIF %':g=>avg(g.map(r=>r.lt<=r.target?100:0))}};
+const isMoney=m=>/\$/.test(m);let REPORT={title:'',rows:[],dim:'',meas:''};
+function fillReportSelects(){const ds=$('rpDataset').value||'shipments';$('rpDim').innerHTML=Object.keys(RP_DIMS[ds]).map(d=>`<option>${d}</option>`).join('');$('rpMeasure').innerHTML=Object.keys(RP_MEAS[ds]).map(m=>`<option>${m}</option>`).join('');
+  $('rpFilter').innerHTML=ds==='shipments'?'<option value="">All modes</option>'+['Ocean','Air','Road','Rail'].map(m=>`<option>${m}</option>`).join(''):'<option value="">All</option>';}
+function runReport(){const ds=$('rpDataset').value||'shipments',filt=$('rpFilter').value;
+  const dimMap=RP_DIMS[ds],measMap=RP_MEAS[ds];
+  const dim=dimMap[$('rpDim').value]?$('rpDim').value:Object.keys(dimMap)[0];
+  const meas=measMap[$('rpMeasure').value]?$('rpMeasure').value:Object.keys(measMap)[0];
+  let data=ds==='shipments'?SHIPMENTS:LEADTIME;if(ds==='shipments'&&filt)data=data.filter(s=>s.mode===filt);
+  const keyFn=dimMap[dim],measFn=measMap[meas];const groups={};data.forEach(r=>{const k=keyFn(r)||'—';(groups[k]=groups[k]||[]).push(r);});
+  let rows=Object.entries(groups).map(([k,g])=>({key:k,val:measFn(g),n:g.length}));
+  if(dim==='Month')rows.sort((a,b)=>a.key<b.key?-1:1);else rows.sort((a,b)=>b.val-a.val);
+  REPORT={title:meas+' by '+dim,rows,dim,meas,ds};
+  $('rpTitle').textContent=REPORT.title;
+  const fmtV=v=>isMoney(meas)?f$(v):/%/.test(meas)?f1(v)+'%':f1(v);
+  $('rpHead').innerHTML=`<tr><th>${dim}</th><th class="num">${meas}</th><th class="num">Records</th></tr>`;
+  $('rpBody').innerHTML=rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num best">${fmtV(r.val)}</td><td class="num">${r.n}</td></tr>`).join('');
+  const isLine=dim==='Month';
+  mkChart('chReport',{type:isLine?'line':'bar',data:{labels:rows.map(r=>r.key),datasets:[{label:meas,data:rows.map(r=>Math.round(r.val*100)/100),backgroundColor:isLine?'rgba(34,211,238,.15)':rows.map((_,i)=>CC[i%CC.length]),borderColor:'#22d3ee',tension:.3,fill:isLine}]},options:{indexAxis:(!isLine&&rows.length>6)?'y':'x',plugins:{legend:{display:false}}}});}
+function exportReport(type){if(!REPORT.rows.length){toast('Generate a report first.');return;}const rows=[[REPORT.dim,REPORT.meas,'Records'],...REPORT.rows.map(r=>[r.key,Math.round(r.val*100)/100,r.n])];
+  if(type==='csv'){const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='report.csv';a.click();toast('CSV downloaded.');}
+  else exportXlsx('report_'+REPORT.dim.toLowerCase()+'.xlsx',[{name:'Report',rows}]),toast('Excel report downloaded.');}
+function wireData(){
+  renderConns();
+  $('erpImportBtn').onclick=()=>$('erpFile').click();$('erpTemplate').onclick=()=>{exportXlsx('leadtime_template.xlsx',[{name:'LeadTime',rows:[{supplier:'Shanghai',lane:'Shanghai → Los Angeles',commodity:'Electronics',mode:'Ocean',lt:24,target:26}]}]);toast('Template downloaded.');};
+  $('erpFile').onchange=e=>{const f=e.target.files[0];if(!f)return;importXlsx(f,rows=>{if(!rows.length)return;LEADTIME=rows.map(r=>({supplier:r.supplier||r.Supplier||'—',lane:r.lane||r.Lane||'—',commodity:r.commodity||r.Commodity||'—',mode:r.mode||r.Mode||'Ocean',lt:+(r.lt||r.LT||r.leadtime)||10,target:+(r.target||r.Target)||12}));toast(`Imported ${LEADTIME.length} lead-time records.`);renderLead();});};
+  $('ivRun').onclick=runInventory;
+  $('rpDataset').onchange=()=>{fillReportSelects();runReport();};$('rpRun').onclick=runReport;
+  $('rpExport').onclick=()=>exportReport('xlsx');$('rpCsv').onclick=()=>exportReport('csv');$('rpPrint').onclick=()=>window.print();
+  document.querySelectorAll('#view-data .chip[data-preset]').forEach(c=>c.onclick=()=>{const p=c.dataset.preset;const set=(ds,dim,meas)=>{$('rpDataset').value=ds;fillReportSelects();$('rpDim').value=dim;$('rpMeasure').value=meas;runReport();};
+    if(p==='otd')set('shipments','Carrier','OTD %');if(p==='spendmode')set('shipments','Mode','Total freight $');if(p==='lane')set('shipments','Lane','Count');if(p==='leadcom')set('leadtime','Commodity','Avg lead time');if(p==='cts')set('shipments','Customer','Avg margin $');});
+  fillReportSelects();
+}
+function renderData(){renderLead();runInventory();runReport();}
+
+/* =========================================================================
+   AI COPILOT
+   ========================================================================= */
 function botSay(t){const d=document.createElement('div');d.className='msg bot';d.textContent=t;$('chatlog').appendChild(d);$('chatlog').scrollTop=1e9;}
 function userSay(t){const d=document.createElement('div');d.className='msg user';d.textContent=t;$('chatlog').appendChild(d);$('chatlog').scrollTop=1e9;}
-function ctxBlob(){return `Current plan: ${JSON.stringify(PLAN)}. Locations: ${locations.map(l=>l.name).join(', ')}. US modal split by value: truck 73%, multimodal 12%, pipeline 5%, rail 3%, air 2%, water 1%.`;}
-function offline(q){const t=q.toLowerCase();
-  if(/my route|current route|explain.*route|improve/.test(t)){if(PLAN.mode==='route')return `Your ${PLAN.transport} route covers ${PLAN.order.length-1} cities in ${Math.round(PLAN.km).toLocaleString()} km (~$${Math.round(PLAN.cost).toLocaleString()}, ${(PLAN.hours/24).toFixed(1)} days). Longest leg: ${PLAN.maxPair}. To improve: re-order is already TSP-optimal; switch to a cheaper mode for long legs, add a consolidation stop, or move your origin toward the center of gravity.`;if(PLAN.mode==='hub')return `You opened ${PLAN.hubs.join(', ')} serving ${PLAN.demand} cities (${Math.round(PLAN.total).toLocaleString()} km total). Add a hub to cut average distance, or compare against the single center-of-gravity DC.`;return 'Add cities on the World Planner and press Optimize, then I can explain the route.';}
-  if(/truck.*share|share.*truck/.test(t))return"Trucks move ~73% of U.S. domestic freight by value and ~65% by weight (BTS Freight Analysis Framework).";
-  if(/electronic|high.value|air.*overseas|semiconductor|pharma/.test(t))return"High-value, low-weight, time-critical goods (electronics, semiconductors, pharma) ship by AIR — they're <1% of freight weight but a big share of value, so air's speed/security premium pays off. Reserve ocean for non-urgent bulk.";
-  if(/pipeline|crude|oil/.test(t))return"Crude by pipeline ~$5/bbl vs rail $10–15 and truck $20. Pipelines have near-zero marginal cost per barrel at scale; internationally crude shifts to marine tankers.";
-  if(/air.*ocean|ocean.*air|expedit/.test(t))return"Air ~$2.80–7.50/kg vs ocean ~$0.10–0.80/kg (~10x) but ~10x faster (3 vs 30 days). Express air adds 1.5–2.5x.";
-  if(/hub|facility|warehouse|center of gravity|centroid/.test(t))return"The Hub Designer mode opens the best subset of cities as hubs (greedy p-median) to minimize total service distance. The center-of-gravity insight shows the single best DC location to benchmark against.";
-  if(/geocode|city|location|add/.test(t))return"Type any city in the World Planner — it autocompletes from a built-in global list, and presses Enter to geocode any address worldwide via OpenStreetMap. Mark one as ORIGIN, then Optimize.";
-  if(/hello|hi|hey/.test(t))return"Hey! Add some real cities on the World Planner and hit Optimize — I'll break down the route.";
-  return"I'm the offline assistant — strongest on your current plan, modes, modal split, and crude economics. Add an API key (⚙) for full real-time AI on anything.";
-}
+function opsSummary(){const dv=delivered();const otif=avg(dv.map(s=>(s.onTime&&s.inFull)?100:0)),otd=avg(dv.map(s=>s.onTime?100:0));
+  const exc=active().filter(s=>s.exc),atRisk=active().filter(s=>s.risk>=60);const dnd=SHIPMENTS.reduce((a,s)=>a+s.dndCost,0);const over=SHIPMENTS.reduce((a,s)=>a+Math.max(0,s.invoiced-s.should),0);
+  const cts=ctsAgg('customer'),loss=cts.filter(c=>c.margin<0);const la=laneAgg().filter(l=>l.pc>8);const cs=carrierStats();const worst=cs.slice().sort((a,b)=>a.otd-b.otd)[0];
+  return{otif,otd,inTransit:SHIPMENTS.filter(s=>s.status==='In Transit').length,exc,atRisk,dnd,over,loss,la,worst,cts};}
+function ctxBlob(){const o=opsSummary();return `LIVE STATE — OTIF ${o.otif.toFixed(0)}%, OTD ${o.otd.toFixed(0)}%, ${o.inTransit} in transit, ${o.exc.length} open exceptions, ${o.atRisk.length} at-risk (risk≥60). D&D leak ${f$(o.dnd)}; freight overspend vs should-cost ${f$(o.over)} across ${o.la.length} flagged lanes. Worst SLA carrier: ${o.worst?o.worst.name+' '+o.worst.otd.toFixed(0)+'% OTD':'n/a'}. Loss-making customers: ${o.loss.map(c=>c.name).join(', ')||'none'}. ${SHIPMENTS.length} shipments across Ocean/Air/Rail/Road. Crude chokepoints (EIA 2024 Mb/d): Hormuz 20, Malacca 22.5, Suez+SUMED 4.8, Bab-el-Mandeb 4.1. Incoterms 2020: 11 rules; risk transfers earliest at EXW, latest at DDP.`;}
+function findInco(t){const codes=['exw','fca','fas','fob','cfr','cif','cpt','cip','dap','dpu','ddp'];return codes.filter(c=>new RegExp('\\b'+c+'\\b','i').test(t)).map(c=>INC[c.toUpperCase()]);}
+function offline(q){const t=q.toLowerCase();const o=opsSummary();
+  if(/summary|summari|how are|operations|overview|biggest risk|whats happening|what's happening/.test(t)){const e=o.exc.slice(0,3).map(s=>`${s.id} (${esc(s.exc)})`).join(', ');return `Ops snapshot: OTIF ${o.otif.toFixed(0)}% · OTD ${o.otd.toFixed(0)}% · ${o.inTransit} in transit · ${o.exc.length} open exceptions · ${o.atRisk.length} at-risk. Top exceptions: ${e||'none'}. Silent leaks: D&D ${f$(o.dnd)} and ${f$(o.over)} freight overspend vs should-cost. Start in the Exception Inbox, then audit the flagged lanes in Cost Intelligence.`;}
+  if(/bled money|losing money|lost money|unprofitable|cost.to.serve|cost to serve|margin|where.*money/.test(t)){if(!o.loss.length)return `No accounts are currently loss-making — lowest margin is ${o.cts[0].name} at ${f1(o.cts[0].mpc)}%. Check Cost Intelligence → Cost-to-Serve to see margin by customer, lane and commodity.`;return `These are bleeding money (negative margin after logistics + D&D): ${o.loss.map(c=>c.name+' '+f$(c.margin)).join(', ')}. Biggest driver is freight overspend (${f$(o.over)}) and D&D (${f$(o.dnd)}). Re-rate the lanes, renegotiate, or re-mode them — see Cost-to-Serve and Should-Move Cost.`;}
+  if(/sla|breach|worst carrier|tender|on.time.*carrier|carrier.*on.time/.test(t)){const w=o.worst;return w?`${w.name} is the weakest on SLA at ${w.otd.toFixed(0)}% OTD (target 95%), grade ${w.grade}, tender acceptance ${(w.ref.tender*100).toFixed(0)}%. Action: shift volume to a higher-grade carrier on those lanes (Performance → Carrier scorecard) and put ${w.name} on a corrective-action plan.`:'No carrier data yet.';}
+  if(/should.cost|should-cost|overpaid|overpric|invoice audit|audit/.test(t)){const top=o.la[0];return top?`Should-Move Cost flags ${o.la.length} lanes over +8% of benchmark. Worst: ${top.lane} (${top.mode}) invoiced ${f$(top.inv)} vs should-cost ${f$(top.should)} — ${f1(top.pc)}% high. Open Cost Intelligence to audit and recover ~${f$(o.over*0.6)}.`:'No lanes are materially overpriced right now — invoices track should-cost.';}
+  if(/demurrage|detention|\bd&d\b|\bdnd\b/.test(t)){const d=SHIPMENTS.filter(s=>s.dndCost>0).sort((a,b)=>b.dndCost-a.dndCost)[0];return `Detention & demurrage leak is ${f$(o.dnd)} (${f1(o.dnd/SHIPMENTS.reduce((a,s)=>a+s.invoiced,0)*100)}% of freight spend). Worst single event: ${d?d.id+' at '+d.d+' '+f$(d.dndCost):'n/a'}. File disputes from the Exception Inbox and watch free-time on ocean containers.`;}
+  if(/hormuz|crude|tanker|chokepoint|suez|red sea|malacca|bab|cape/.test(t))return `Crude flows hinge on chokepoints (EIA 2024): Hormuz ~20 Mb/d (~20% of world oil, no real bypass), Malacca ~22.5, Suez+SUMED ~4.8 and Bab-el-Mandeb ~4.1 (both down sharply as Red Sea attacks pushed tankers around the Cape of Good Hope, +10–14 days). If Hormuz closed there's no maritime alternative for most Gulf crude — only limited pipelines (e.g., Saudi East-West, UAE Fujairah). Use Global & Crude → toggle "Reroute via Cape" to see the cost/time hit.`;
+  const inc=findInco(t);if(inc.length){return inc.map(i=>`${i.code} (${i.name}, ${i.mode}-mode): risk transfers ${i.riskTxt.toLowerCase()}; seller handles ${i.exp==='S'?'export customs':'no customs'}${i.freight==='S'?' + main freight':''}${i.ins!=='—'?' + insurance':''}; ${i.imp==='S'?'seller even pays import duty (DDP)':'buyer clears import & pays duty'}. ${i.use}`).join('\n\n');}
+  if(/incoterm/.test(t))return `Incoterms 2020 are 11 rules splitting cost & risk: 7 any-mode (EXW, FCA, CPT, CIP, DAP, DPU, DDP) and 4 sea-only (FAS, FOB, CFR, CIF). Risk passes earliest at EXW (seller's dock) and latest at DDP (delivered, duty paid). Ask me about a specific term, or use the calculator in Cost Intelligence.`;
+  if(/lead time|safety stock|reorder|variabil|inventory/.test(t)){const st=stats(LEADTIME.map(r=>r.lt));return `Across imported lanes, lead time averages ${f1(st.mean)} days (σ ${f1(st.sd)}, P90 ${st.p90}). Safety stock scales with lead-time σ, not the average — so reducing variability cuts inventory cheaply. Use Data & Reports → Inventory planning to size safety stock and reorder points.`;}
+  if(/sensitivity|shadow price|reduced cost|solver|optimi|constraint/.test(t)){if(OPTRES&&OPTRES.status==='optimal'){const b=OPTRES.constraints.filter(c=>c.binding&&Math.abs(c.shadow)>1e-6&&!c.bound).sort((a,b)=>Math.abs(b.shadow)-Math.abs(a.shadow))[0];return `Your current model's optimum is ${f$(OPTRES.objective)}. ${b?`Binding bottleneck: ${b.name} (shadow price ${f1(b.shadow)}) — one more unit changes the objective by ${f1(Math.abs(b.shadow))}, valid up to +${rng(b.rhsInc)}/−${rng(b.rhsDec)}.`:'No binding constraints — you have slack.'} Hit "Export to Excel" for the full Answer + Sensitivity report.`;}return `Open Optimization Studio, pick a template (mode-mix, transportation, consolidation…), Solve, and you'll get shadow prices, reduced costs and ranging — then "AI: interpret" or export the Excel sensitivity report.`;}
+  if(/co2|emission|sustain|modal shift|carbon|esg/.test(t)){const rec=modalShiftRecs().filter(r=>r.fits)[0];return `CO₂ is tracked per shipment. ${rec?`Top modal-shift: ${rec.lane} from ${rec.from}→${rec.to} saves ~${fmt(rec.co2Save)} kg CO₂ and ${f$(rec.costSave)} while still meeting SLA.`:'Few shift candidates have SLA slack right now.'} See Performance → Modal-shift recommender.`;}
+  if(/my route|current route|explain.*route|improve|hub|facility|center of gravity/.test(t)){if(PLAN.mode==='route')return `Your ${PLAN.transport} route covers ${PLAN.order.length-1} cities in ${fmt(PLAN.km)} km (~${f$(PLAN.cost)}, ${(PLAN.hours/24).toFixed(1)} days). Longest leg: ${PLAN.maxPair}. It's TSP-optimal; switch a long leg to a cheaper mode or add a consolidation stop.`;if(PLAN.mode==='hub')return `You opened ${PLAN.hubs.join(', ')} serving ${PLAN.demand} cities (${fmt(PLAN.total)} km). Add a hub to cut average distance or compare to the center-of-gravity DC.`;return 'Use Global & Crude → World planner: add cities, mark an ORIGIN, and Optimize.';}
+  if(/hello|^hi|hey/.test(t))return "Hey Zumar! Ask me for an ops summary, which lanes bled money, an Incoterm, or to interpret your solver's sensitivity report.";
+  return "I'm the offline copilot — strongest on your live ops (OTIF/SLA/exceptions), cost intelligence, the solver's sensitivity, crude routing, Incoterms and lead times. Add an API key (⚙) for full real-time AI on anything.";}
 async function ask(q){if(!q.trim())return;userSay(q);$('chatInput').value='';const key=localStorage.getItem('lo_key');
-  if(!key){setTimeout(()=>botSay(offline(q)),250);return;}
+  if(!key){setTimeout(()=>botSay(offline(q)),220);return;}
   const th=document.createElement('div');th.className='msg bot';th.textContent='…';$('chatlog').appendChild(th);
-  try{const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[{role:'system',content:'You are Zumar\'s Logic-tics Stop, a global transportation & logistics optimization co-pilot. Use the plan context for in-scope questions and answer general questions too. '+ctxBlob()},{role:'user',content:q}]})});const j=await res.json();th.remove();botSay(j.choices?.[0]?.message?.content||('Error: '+(j.error?.message||'no response')));}
-  catch(e){th.remove();botSay('Request failed: '+e.message+'\n\n'+offline(q));}
-}
+  try{const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[{role:'system',content:"You are the copilot inside Zumar's Logic-tics Stop, a transportation & logistics optimization suite. Be concise and practical. Use this live context for in-scope questions, and answer general questions too. "+ctxBlob()},{role:'user',content:q}]})});const j=await res.json();th.remove();botSay(j.choices?.[0]?.message?.content||('Error: '+(j.error?.message||'no response')));}
+  catch(e){th.remove();botSay('Request failed: '+e.message+'\n\n'+offline(q));}}
+function wireChat(){$('sendBtn').onclick=()=>ask($('chatInput').value);$('chatInput').onkeydown=e=>{if(e.key==='Enter')ask($('chatInput').value);};
+  document.querySelectorAll('#chips .chip').forEach(c=>c.onclick=()=>ask(c.dataset.q));
+  $('gear').onclick=()=>$('modal').classList.add('show');$('closeModal').onclick=()=>$('modal').classList.remove('show');
+  $('saveKey').onclick=()=>{localStorage.setItem('lo_key',$('apiKey').value.trim());localStorage.setItem('lo_url',$('apiUrl').value.trim());localStorage.setItem('lo_model',$('apiModel').value.trim());$('modal').classList.remove('show');const on=!!$('apiKey').value.trim();$('liveBadge').textContent=on?'live':'offline';$('liveBadge').style.color=on?'var(--good)':'var(--muted)';$('liveBadge').style.background=on?'#143':'#332';toast(on?'API key saved — real-time AI enabled.':'Cleared — offline copilot.');};
+  if(localStorage.getItem('lo_url'))$('apiUrl').value=localStorage.getItem('lo_url');if(localStorage.getItem('lo_model'))$('apiModel').value=localStorage.getItem('lo_model');
+  if(localStorage.getItem('lo_key')){$('liveBadge').textContent='live';$('liveBadge').style.color='var(--good)';$('liveBadge').style.background='#143';}}
 
-/* ===================== WIRING ===================== */
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+b.dataset.view).classList.add('active');
-  if(b.dataset.view==='global'&&map)setTimeout(()=>map.invalidateSize(),60);
-});
-// mode toggle
-document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
-  planMode=b.dataset.mode;
-  $('routeOpts').style.display=planMode==='route'?'block':'none';
-  $('hubOpts').style.display=planMode==='hub'?'block':'none';
-  $('mapHead').textContent=planMode==='route'?'Multi-city route planner':'Hub / facility designer';
-  $('addHint').textContent=planMode==='route'?'Type to search; Enter to geocode. Mark one city as ORIGIN.':'Add demand cities; toggle some to ORIGIN as candidate hubs.';
-});
-// autocomplete events
-$('cityInput').oninput=e=>renderAC(e.target.value);
-$('cityInput').onkeydown=async e=>{
-  const items=$('aclist').querySelectorAll('.acitem');
-  if(e.key==='ArrowDown'){acSel=Math.min(acSel+1,items.length-1);items.forEach((it,i)=>it.classList.toggle('sel',i===acSel));e.preventDefault();}
-  else if(e.key==='ArrowUp'){acSel=Math.max(acSel-1,0);items.forEach((it,i)=>it.classList.toggle('sel',i===acSel));e.preventDefault();}
-  else if(e.key==='Enter'){
-    if(acSel>=0&&acMatches[acSel]){const c=acMatches[acSel];addLocation({name:c[0],country:c[1],lat:c[2],lon:c[3]});}
-    else if(acMatches.length){const c=acMatches[0];addLocation({name:c[0],country:c[1],lat:c[2],lon:c[3]});}
-    else{const q=e.target.value.trim();if(q){toast('Geocoding "'+q+'"…');const g=await geocode(q);if(g)addLocation(g);else toast('Could not find "'+q+'".');}}
-  }};
-document.addEventListener('click',e=>{if(!e.target.closest('.ac'))$('aclist').classList.remove('show');});
-$('optimizeBtn').onclick=optimize;
-$('clearBtn').onclick=()=>{locations=[];renderLocList();if(layerGroup)layerGroup.clearLayers();$('planKpis').innerHTML='';$('planInsights').innerHTML='';$('planNote').textContent='Add at least 2 cities, then press Optimize.';};
-$('exampleBtn').onclick=()=>{locations=[];const names=planMode==='route'?EXAMPLE_ROUTE:EXAMPLE_HUBS;names.forEach(nm=>{const c=CITIES.find(x=>x[0]===nm);if(c)locations.push({name:c[0],country:c[1],lat:c[2],lon:c[3],role:'stop'});});if(locations.length)locations[0].role='origin';renderLocList();drawMarkers();optimize();};
-$('customizeBtn').onclick=()=>{const p=$('customPanel');p.style.display=p.style.display==='none'?'block':'none';};
-$('kHub').oninput=e=>$('kHubLbl').textContent=e.target.value;
-document.querySelectorAll('#customPanel input').forEach(c=>c.onchange=()=>{const k=c.dataset.kpi,cd=c.dataset.card;if(k)KPIVIS[k]=c.checked;if(cd)CARDVIS[cd]=c.checked;if(PLAN.mode){renderPlanKpis();renderInsights();}});
-// sandbox
-['n','v','cap','f','o'].forEach(id=>{const L={n:'nLbl',v:'vLbl',cap:'capLbl',f:'fLbl',o:'oLbl'}[id];$(id).oninput=e=>$(L).textContent=e.target.value;});
-$('problem').onchange=e=>{$('vrpControls').style.display=e.target.value==='vrp'?'block':'none';$('facControls').style.display=e.target.value==='facility'?'block':'none';};
-$('solveBtn').onclick=solveSandbox;
-// exec
-document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('active'));b.classList.add('active');bars('splitBars',MODAL[b.dataset.split]);});
-// cost
-$('cRun').onclick=runCost;
-// chat
-$('sendBtn').onclick=()=>ask($('chatInput').value);$('chatInput').onkeydown=e=>{if(e.key==='Enter')ask($('chatInput').value);};
-document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>ask(c.dataset.q));
-$('gear').onclick=()=>$('modal').classList.add('show');$('closeModal').onclick=()=>$('modal').classList.remove('show');
-$('saveKey').onclick=()=>{localStorage.setItem('lo_key',$('apiKey').value.trim());localStorage.setItem('lo_url',$('apiUrl').value.trim());localStorage.setItem('lo_model',$('apiModel').value.trim());$('modal').classList.remove('show');const on=!!$('apiKey').value.trim();$('liveBadge').textContent=on?'live':'offline';$('liveBadge').style.color=on?'var(--good)':'var(--muted)';$('liveBadge').style.background=on?'#143':'#332';toast(on?'API key saved — real-time AI enabled.':'Cleared — offline assistant.');};
-if(localStorage.getItem('lo_url'))$('apiUrl').value=localStorage.getItem('lo_url');
-if(localStorage.getItem('lo_model'))$('apiModel').value=localStorage.getItem('lo_model');
-if(localStorage.getItem('lo_key')){$('liveBadge').textContent='live';$('liveBadge').style.color='var(--good)';$('liveBadge').style.background='#143';}
+/* =========================================================================
+   COST view wiring  +  NAV  +  INIT
+   ========================================================================= */
+function wireCost(){$('smcRun').onclick=smcCompute;$('cRun').onclick=runCost;$('lcRun').onclick=runLanded;$('lcInco').onchange=e=>incoBoxRender(e.target.value);
+  document.querySelectorAll('#ctsToggle button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#ctsToggle button').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderCts(b.dataset.dim);});}
+const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData};
+function showView(name){document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+name).classList.add('active');
+  if(RENDER[name])RENDER[name]();
+  if(name==='control'&&ctMap)setTimeout(()=>{ctMap.invalidateSize();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));},60);
+  if(name==='global'&&wmap)setTimeout(()=>wmap.invalidateSize(),60);}
+function wireNav(){document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));}
 
-/* init */
 window.addEventListener('load',()=>{
-  initMap();
-  bars('splitBars',MODAL.value);bars('intlBars',INTL);renderCommodity();renderModeRef();bars('ffStack',FF);fillCommodity();runCost();
-  kpiGrid('execKpis',[['Truck share (value)','73','%'],['Crude by pipeline','$5','/bbl'],['Air vs ocean','~10','x'],['Ocean intl (weight)','~80','%']]);
-  solveSandbox();
-  // load example route by default
-  EXAMPLE_ROUTE.forEach(nm=>{const c=CITIES.find(x=>x[0]===nm);if(c)locations.push({name:c[0],country:c[1],lat:c[2],lon:c[3],role:'stop'});});
-  locations[0].role='origin';renderLocList();drawMarkers();optimize();
+  genShipments();genLeadtime();
+  initCTMap();initMap();
+  fillCommodity();
+  wireNav();wireControl();wireCost();wireOpt();wireRouting();wirePlanner();wireGlobal();wireData();wireChat();
+  loadTemplate('modemix');
+  renderControl();renderPerf();renderCost();renderData();solveSandbox();
+  EXAMPLE_ROUTE.forEach(nm=>{const c=CITIES.find(x=>x[0]===nm);if(c)locations.push({name:c[0],country:c[1],lat:c[2],lon:c[3],role:'stop'});});if(locations.length)locations[0].role='origin';renderLocList();drawMarkers();optimize();
 });
 </script>
 </body>

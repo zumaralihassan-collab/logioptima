@@ -1,6 +1,6 @@
 # Zumar's Logic-tics Stop — Global Transportation & Logistics Optimization
 
-An interactive, AI-assisted decision-support tool for transportation and logistics. It uses operations-research solvers and real freight-economics data to **predict, suggest, and explain** logistics operations — from a single delivery route to global multi-modal shipping networks.
+An interactive, AI-assisted decision-support suite for transportation and logistics. It uses operations-research solvers and real freight-economics data to **predict, suggest, and explain** logistics operations — from a single delivery route to a global multi-modal control tower.
 
 **Live demo:** https://zumaralihassan-collab.github.io/logioptima/
 
@@ -8,57 +8,43 @@ An interactive, AI-assisted decision-support tool for transportation and logisti
 
 ## What it does
 
-Four connected views in one self-contained app:
+A single self-contained app, anchored on a **Control Tower** and going deep on five modules. A persistent **AI copilot** runs across every screen (offline data-aware fallback, or full real-time AI with your own OpenAI-compatible key).
 
-- **🌍 World Planner** — a real interactive world map (Leaflet + OpenStreetMap/CARTO). Type any city with built-in autocomplete (~115 global cities) or geocode any address worldwide. Two toggleable modes: a **multi-city route planner** (TSP on real great-circle distances, with road/air/ocean/rail cost, time, and CO₂) and a **hub designer** (facility location — picks which cities to open as hubs). Customizable insight cards (longest leg, mode recommendation, center-of-gravity) and a live AI overview.
-- **⚡ Route Sandbox** — abstract TSP, Vehicle Routing (VRP), facility location, and min-cost network-flow solvers with KPIs and strategy comparison.
-- **📊 Executive Dashboard** — U.S. freight modal split (by value and by weight), a collapsible commodity → ideal-mode matrix, international trade by mode, and strategic insight cards.
-- **💰 Cost Optimization** — a multi-modal cost & transit comparator (same shipment across truck / rail / ocean / air / pipeline, domestic vs import/export), an import/export/freight-forwarding cost stack, and a carrier-mode rate reference.
-
-A persistent **AI assistant** runs across all views. It works offline with a data-aware fallback, and becomes fully conversational (in- and out-of-scope) when you add your own API key (⚙ — OpenAI-compatible: OpenAI, Azure, OpenRouter, or any compatible gateway). The key is stored only in your browser.
+- **🛰️ Control Tower (home).** Live multimodal map — ocean, air, rail, road — with shipments plotted, ETAs, and a **predictive ETA + disruption-risk** score per shipment. A side **Exception Inbox** turns alerts into one-click actions: reroute, switch carrier, file a D&D dispute, resolve. KPI strip for OTIF, OTD, in-transit, exceptions, at-risk, spend and D&D leakage. Excel import/export of the shipment register.
+- **📊 Performance & Carriers.** OTIF/OTD trends, SLA adherence vs target, a **carrier scorecard** (on-time, tender acceptance, damage rate, $/mile, letter grade) that feeds carrier sourcing, plus a sustainability view with CO₂ by mode and a **modal-shift recommender**.
+- **💸 Cost Intelligence.** The signature **Should-Move Cost™** engine computes what a lane *should* cost and audits invoices against it (overpriced-lane flags), a **detention & demurrage leak tracker**, **Cost-to-Serve** by customer/lane/commodity ("where am I quietly losing money?"), a multi-modal comparator, and a **landed-cost calculator** with tariffs, duties and Incoterms® 2020.
+- **🧮 Optimization Studio.** An interactive, visual alternative to Excel Solver: define decision variables and constraints, solve a linear program, and read a full **sensitivity report** (shadow prices, reduced costs, objective & RHS ranging). Templates for mode/load optimization, transportation/min-cost flow, contract mix, and consolidation. **AI interprets** the result, and you can **export Model + Answer + Sensitivity sheets to Excel**. A second tab does visual TSP / VRP / facility / min-cost-flow / **disruption re-routing**.
+- **🌍 Global & Crude.** A real-world route & hub planner (TSP + 2-opt, p-median hubs, center-of-gravity) and an enhanced **global crude shipping network** — export terminals, refining hubs, chokepoints with EIA volumes, tanker classes, a **voyage optimizer** with Worldscale-style economics, a **Cape-of-Good-Hope reroute** toggle, and a longitude/latitude graticule.
+- **🔌 Data & Reports.** ERP connectors (SAP / Oracle / NetSuite / Excel), **lead-time history analytics** with variability stats, supplier/lane scorecards, inventory planning (safety stock & reorder point), and an **ad-hoc report builder** that pivots any dataset to a table + chart and exports to Excel/CSV/print.
 
 ## Data & sources
 
-Figures are drawn from public data and labeled approximate where sources vary:
+Figures are public-data-based and labeled approximate where sources vary:
 
-- U.S. freight modal split — U.S. Bureau of Transportation Statistics, Freight Analysis Framework / Freight Facts & Figures.
-- Crude oil transport economics — pipeline ≈ $5/bbl, rail ≈ $10–15, truck ≈ $20, marine in between.
-- Air vs ocean — air ≈ $2.80–7.50/kg vs ocean ≈ $0.10–0.80/kg (~10×); air ≈ 3 days vs ocean ≈ 30.
-- International U.S. trade — ~80% of tonnage by water; by value water ~47%, air ~27%, truck ~18%.
+- U.S. freight modal split — U.S. Bureau of Transportation Statistics (FAF / Freight Facts & Figures).
+- Oil chokepoint volumes — U.S. EIA *World Oil Transit Chokepoints* (2023–2024): Hormuz ~20 Mb/d, Malacca ~22.5, Suez+SUMED ~4.8, Bab-el-Mandeb ~4.1 (the latter two down sharply as Red Sea disruptions pushed tankers around the Cape).
+- Incoterms® 2020 — 11 rules (7 any-mode, 4 sea/inland-waterway).
 
-Cost-comparator rates are illustrative planning estimates, not quotes.
+The shipment dataset is synthetic but realistic, and seeded for reproducibility. Costs, freight rates and tanker economics are illustrative planning estimates, not quotes. Replace any dataset with your own via Excel import.
 
 ## Run locally
 
 It's a single static file — no build step.
 
 ```bash
-# just open it
-open index.html          # macOS
-# or serve it
-python3 -m http.server 8000   # then visit http://localhost:8000
+open index.html                 # macOS
+# or
+python3 -m http.server 8000     # then visit http://localhost:8000
 ```
 
-## Deploy (GitHub Pages)
+## AI copilot
 
-This repo is Pages-ready (`index.html` at the root). After pushing:
-
-1. Repo **Settings → Pages**
-2. **Source:** Deploy from a branch → **main** / **/(root)**
-3. Save — your live URL is `https://<username>.github.io/<repo>/`
-
-## Roadmap
-
-See [`ARCHITECTURE_AND_ROADMAP.md`](ARCHITECTURE_AND_ROADMAP.md) for the full three-layer design (Python optimization engine · Excel I/O · web + chatbot) and the phased build plan — including the planned move from in-browser heuristics to a real **Google OR-Tools / PuLP** backend with `.xlsx` round-trip import/export.
+Works offline with a data-aware assistant (ops summaries, "which lanes bled money?", SLA breaches, Incoterms, crude risk, sensitivity interpretation). Click ⚙ to add an OpenAI-compatible key (OpenAI, Azure, OpenRouter, or any compatible gateway) for full real-time AI. The key is stored only in your browser.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `index.html` | The full global app (deployed entry point) |
+| `index.html` | The full suite (deployed entry point) |
 | `logioptima_prototype.html` | Earlier single-view UX prototype |
 | `ARCHITECTURE_AND_ROADMAP.md` | Architecture & phased roadmap |
-
----
-
-Inspired by real fulfillment-network challenges: warehouse/FC placement, trucking optimization, and on-time-delivery assurance.
