@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# temp / checks
+_app_check.js
+*.log
+node_modules/
+__pycache__/

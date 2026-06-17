@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LogiOptima — Transportation & Logistics Optimization (Prototype)</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232d; --line:#2b3340;
+    --txt:#e6edf3; --muted:#8b97a7; --accent:#3b82f6; --accent2:#22d3ee;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --depot:#f59e0b;
+    --shadow:0 6px 24px rgba(0,0,0,.35);
+    --r:12px; font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.45}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;
+    background:linear-gradient(90deg,#0d1117,#111a2e);border-bottom:1px solid var(--line)}
+  .logo{width:34px;height:34px;border-radius:9px;background:
+    conic-gradient(from 200deg,var(--accent),var(--accent2),var(--accent));
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#06121f}
+  header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
+  header .tag{color:var(--muted);font-size:12px;margin-top:1px}
+  .badge{margin-left:auto;font-size:11px;color:var(--accent2);
+    border:1px solid var(--line);padding:4px 10px;border-radius:20px;background:var(--panel)}
+  .wrap{display:grid;grid-template-columns:280px 1fr 330px;gap:14px;padding:14px;height:calc(100vh - 64px)}
+  .col{display:flex;flex-direction:column;gap:14px;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--shadow);padding:14px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+    margin:0 0 12px;font-weight:700}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+  select,input[type=text],input[type=password]{width:100%;background:var(--panel2);
+    border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:13px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  .val{color:var(--accent2);font-weight:700}
+  button{cursor:pointer;border:none;border-radius:9px;padding:9px 12px;font-size:13px;
+    font-weight:600;color:#06121f;background:var(--accent);transition:.15s;width:100%}
+  button:hover{filter:brightness(1.1)}
+  button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  button.ghost:hover{border-color:var(--accent)}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .btns .full{grid-column:1/3}
+  /* map */
+  .mapcard{flex:1;display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+  .maphead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .maphead h2{margin:0}
+  .legend{margin-left:auto;display:flex;gap:14px;font-size:11px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  #map{flex:1;width:100%;background:
+    radial-gradient(circle at 30% 20%,#13233c,transparent 60%),
+    radial-gradient(circle at 80% 80%,#102033,transparent 55%),#0b1220}
+  /* KPIs */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  .kpi .k{font-size:11px;color:var(--muted)}
+  .kpi .v{font-size:21px;font-weight:800;margin-top:3px}
+  .kpi .v small{font-size:12px;font-weight:600;color:var(--muted)}
+  .pill{font-size:11px;padding:2px 7px;border-radius:20px;font-weight:700}
+  /* chat */
+  .chatcard{flex:1;display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+  .chathead{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .chathead h2{margin:0}
+  .gear{margin-left:auto;background:none;width:auto;color:var(--muted);padding:4px 8px;font-size:16px}
+  #chatlog{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:88%;padding:9px 12px;border-radius:12px;font-size:13px;white-space:pre-wrap}
+  .msg.bot{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:3px}
+  .msg.user{background:var(--accent);color:#06121f;align-self:flex-end;border-bottom-right-radius:3px;font-weight:500}
+  .chatin{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+  .chatin input{flex:1}
+  .chatin button{width:auto;padding:9px 14px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 10px}
+  .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+    padding:5px 9px;border-radius:20px;cursor:pointer}
+  .chip:hover{border-color:var(--accent);color:var(--txt)}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.show{display:flex}
+  .modal .card{width:420px;max-width:92vw}
+  .modal .close{float:right;background:none;width:auto;color:var(--muted);font-size:18px;padding:0}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .barchart{display:flex;align-items:flex-end;gap:14px;height:120px;padding-top:8px}
+  .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end}
+  .bar .fill{width:70%;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:6px 6px 0 0;transition:height .5s}
+  .bar .lbl{font-size:10px;color:var(--muted);text-align:center}
+  .bar .num{font-size:11px;font-weight:700}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);
+    border:1px solid var(--accent);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;
+    transition:.3s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1}
+  @media (max-width:1100px){.wrap{grid-template-columns:1fr;height:auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">L</div>
+  <div>
+    <h1>LogiOptima</h1>
+    <div class="tag">Transportation &amp; Logistics Optimization — interactive prototype</div>
+  </div>
+  <div class="badge">Phase 0 · UX preview</div>
+</header>
+
+<div class="wrap">
+  <!-- LEFT: controls -->
+  <div class="col">
+    <div class="card">
+      <h2>Scenario</h2>
+      <label>Problem type</label>
+      <select id="problem">
+        <option value="tsp">TSP — single-route ordering</option>
+        <option value="vrp">VRP — multi-vehicle delivery</option>
+        <option value="facility">Facility location (warehouses)</option>
+        <option value="network">Network flow — min transport cost</option>
+      </select>
+
+      <label>Stops / demand points: <span class="val" id="nLbl">14</span></label>
+      <input type="range" id="n" min="5" max="40" value="14" />
+
+      <div id="vrpControls">
+        <label>Vehicles: <span class="val" id="vLbl">3</span></label>
+        <input type="range" id="v" min="1" max="8" value="3" />
+        <label>Vehicle capacity: <span class="val" id="capLbl">60</span> units</label>
+        <input type="range" id="cap" min="20" max="120" value="60" step="10" />
+      </div>
+
+      <div id="facControls" style="display:none">
+        <label>Candidate sites: <span class="val" id="fLbl">6</span></label>
+        <input type="range" id="f" min="2" max="12" value="6" />
+        <label>Warehouses to open: <span class="val" id="oLbl">2</span></label>
+        <input type="range" id="o" min="1" max="6" value="2" />
+      </div>
+
+      <label>Strategy</label>
+      <select id="strategy">
+        <option value="2opt">Nearest-neighbor + 2-opt (best)</option>
+        <option value="nn">Nearest-neighbor (greedy)</option>
+        <option value="random">Random baseline</option>
+      </select>
+
+      <label>Cost / km ($) &nbsp; · &nbsp; Avg speed (km/h)</label>
+      <div class="row">
+        <input type="text" id="rate" value="1.85" />
+        <input type="text" id="speed" value="55" />
+      </div>
+
+      <div class="btns">
+        <button class="full" id="solveBtn">⚡ Generate &amp; Solve</button>
+        <button class="ghost" id="importBtn">⬆ Import Excel</button>
+        <button class="ghost" id="exportBtn">⬇ Export Excel</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Strategy comparison</h2>
+      <div class="barchart" id="bars">
+        <div class="bar"><div class="fill" style="height:30%"></div><div class="num">—</div><div class="lbl">Random</div></div>
+        <div class="bar"><div class="fill" style="height:60%"></div><div class="num">—</div><div class="lbl">Greedy</div></div>
+        <div class="bar"><div class="fill" style="height:90%"></div><div class="num">—</div><div class="lbl">2-opt</div></div>
+      </div>
+      <div class="hint">Total distance by strategy — lower is better.</div>
+    </div>
+  </div>
+
+  <!-- CENTER: map + KPIs -->
+  <div class="col">
+    <div class="card mapcard">
+      <div class="maphead">
+        <h2 id="mapTitle">Network map</h2>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--depot)"></span>Depot / FC</span>
+          <span><span class="dot" style="background:var(--accent2)"></span>Stop / demand</span>
+          <span><span class="dot" style="background:var(--accent)"></span>Route</span>
+        </div>
+      </div>
+      <svg id="map" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="card">
+      <h2>Key metrics</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="k">Total distance</div><div class="v"><span id="kDist">0</span> <small>km</small></div></div>
+        <div class="kpi"><div class="k">Est. transport cost</div><div class="v">$<span id="kCost">0</span></div></div>
+        <div class="kpi"><div class="k">Est. drive time</div><div class="v"><span id="kTime">0</span> <small>h</small></div></div>
+        <div class="kpi"><div class="k">On-time rate <span class="pill" id="otPill" style="background:#143; color:var(--good)">—</span></div><div class="v"><span id="kOT">0</span><small>%</small></div></div>
+      </div>
+      <div class="hint" id="solveNote" style="margin-top:10px">Pick a scenario and press <b>Generate &amp; Solve</b>.</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: chatbot -->
+  <div class="col">
+    <div class="card chatcard">
+      <div class="chathead">
+        <h2>AI Assistant</h2>
+        <button class="gear" id="gear" title="API settings">⚙</button>
+      </div>
+      <div id="chatlog">
+        <div class="msg bot">Hi Zumar 👋 I'm your logistics co-pilot. Solve a scenario and ask me things like "why this route?" or "how do I cut cost?" — I also answer general questions. Add your API key (⚙) for full conversational AI; without it I answer from the current scenario.</div>
+      </div>
+      <div class="chips" id="chips">
+        <div class="chip" data-q="Explain the current solution">Explain this solution</div>
+        <div class="chip" data-q="How can I reduce total cost?">Reduce cost?</div>
+        <div class="chip" data-q="What is the traveling salesman problem?">What is TSP?</div>
+        <div class="chip" data-q="Why is on-time rate at this level?">On-time rate?</div>
+      </div>
+      <div class="chatin">
+        <input type="text" id="chatInput" placeholder="Ask anything…" />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- API settings modal -->
+<div class="modal" id="modal">
+  <div class="card">
+    <button class="close" id="closeModal">✕</button>
+    <h2>Chatbot API settings</h2>
+    <label>Provider endpoint (OpenAI-compatible)</label>
+    <input type="text" id="apiUrl" value="https://api.openai.com/v1/chat/completions" />
+    <label>Model</label>
+    <input type="text" id="apiModel" value="gpt-4o-mini" />
+    <label>API key (stored locally in your browser only)</label>
+    <input type="password" id="apiKey" placeholder="sk-..." />
+    <div class="hint">Your key never leaves this browser except to call the endpoint you specify. Leave blank to use the offline scenario-aware assistant.</div>
+    <div class="btns"><button class="full" id="saveKey">Save</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- state ---------- */
+const S = { points:[], depot:null, problem:'tsp', solution:null, kpis:null, compare:null };
+const $ = id => document.getElementById(id);
+const rnd = (a,b)=>a+Math.random()*(b-a);
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1900);}
+
+/* ---------- geometry ---------- */
+const W=800,H=520,PAD=40;
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)/8;} // px -> ~km scale
+function routeLen(order,pts){let d=0;for(let i=0;i<order.length-1;i++)d+=dist(pts[order[i]],pts[order[i+1]]);return d;}
+
+function genPoints(n){
+  const pts=[];
+  for(let i=0;i<n;i++) pts.push({x:rnd(PAD,W-PAD),y:rnd(PAD,H-PAD),demand:Math.round(rnd(5,25)),id:i});
+  return pts;
+}
+
+/* ---------- TSP ---------- */
+function nearestNeighbor(pts,start=0){
+  const n=pts.length,seen=new Array(n).fill(false),order=[start];seen[start]=true;
+  for(let k=1;k<n;k++){let last=order[order.length-1],best=-1,bd=1e9;
+    for(let j=0;j<n;j++) if(!seen[j]){const d=dist(pts[last],pts[j]);if(d<bd){bd=d;best=j;}}
+    order.push(best);seen[best]=true;}
+  order.push(start);return order;
+}
+function twoOpt(order,pts){
+  let improved=true,best=order.slice();
+  while(improved){improved=false;
+    for(let i=1;i<best.length-2;i++)for(let k=i+1;k<best.length-1;k++){
+      const a=pts[best[i-1]],b=pts[best[i]],c=pts[best[k]],d=pts[best[k+1]];
+      if(dist(a,b)+dist(c,d) > dist(a,c)+dist(b,d)+1e-9){
+        const seg=best.slice(i,k+1).reverse();best=best.slice(0,i).concat(seg,best.slice(k+1));improved=true;}
+    }}
+  return best;
+}
+function randomOrder(pts){const o=pts.map((_,i)=>i);for(let i=o.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[o[i],o[j]]=[o[j],o[i]];}o.push(o[0]);return o;}
+
+function solveTSP(pts,strategy){
+  const nn=nearestNeighbor(pts,0);
+  const opt=twoOpt(nn,pts);
+  const rndO=randomOrder(pts);
+  const compare={Random:routeLen(rndO,pts),Greedy:routeLen(nn,pts),'2-opt':routeLen(opt,pts)};
+  let order = strategy==='random'?rndO : strategy==='nn'?nn : opt;
+  return {routes:[order],compare};
+}
+
+/* ---------- VRP (capacity clusters + per-route 2-opt) ---------- */
+function solveVRP(pts,depot,nVeh,cap,strategy){
+  const customers=pts.map((p,i)=>({...p,idx:i})).sort((a,b)=>Math.atan2(a.y-depot.y,a.x-depot.x)-Math.atan2(b.y-depot.y,b.x-depot.x));
+  const routes=[];let cur=[],load=0;
+  for(const c of customers){
+    if(load+c.demand>cap || cur.length>=Math.ceil(customers.length/nVeh)+1){if(cur.length)routes.push(cur);cur=[];load=0;}
+    cur.push(c);load+=c.demand;
+  }
+  if(cur.length)routes.push(cur);
+  // build full point list per route incl depot, optimise order
+  const all=[depot,...pts];
+  const built=routes.slice(0,Math.max(nVeh,routes.length)).map(r=>{
+    const local=[depot,...r.map(c=>pts[c.idx])];
+    let ord=nearestNeighbor(local,0);
+    if(strategy==='2opt')ord=twoOpt(ord,local);
+    return ord.map(i=>i===0?{depot:true,x:depot.x,y:depot.y}:r[i-1]?{x:r[i-1].x,y:r[i-1].y}:{x:depot.x,y:depot.y});
+  });
+  // distance
+  let total=0;const drawRoutes=[];
+  routes.forEach(r=>{
+    const local=[depot,...r];let ord=nearestNeighbor(local,0);if(strategy==='2opt')ord=twoOpt(ord,local);
+    total+=routeLen(ord,local);
+    drawRoutes.push(ord.map(i=>local[i]));
+  });
+  return {drawRoutes,total};
+}
+
+/* ---------- Facility location (greedy p-median) ---------- */
+function solveFacility(demandPts,sites,open){
+  const chosen=[];
+  const cands=sites.map((s,i)=>i);
+  while(chosen.length<open && cands.length){
+    let best=-1,bestCost=1e18;
+    for(const c of cands){
+      const test=[...chosen,c];let cost=0;
+      for(const d of demandPts){let m=1e9;for(const s of test)m=Math.min(m,dist(d,sites[s]));cost+=m*d.demand;}
+      if(cost<bestCost){bestCost=cost;best=c;}
+    }
+    chosen.push(best);cands.splice(cands.indexOf(best),1);
+  }
+  // assignment
+  const assign=demandPts.map(d=>{let m=1e9,w=chosen[0];for(const s of chosen){const dd=dist(d,sites[s]);if(dd<m){m=dd;w=s;}}return {d,s:w,dist:m};});
+  const total=assign.reduce((a,x)=>a+x.dist*x.d.demand,0)/100;
+  return {chosen,assign,total};
+}
+
+/* ---------- Network flow (greedy least-cost transportation) ---------- */
+function solveNetwork(sources,sinks){
+  let supply=sources.map(s=>s.supply), demand=sinks.map(s=>s.demand);
+  const flows=[];let cost=0;
+  const cells=[];
+  sources.forEach((s,i)=>sinks.forEach((t,j)=>cells.push({i,j,c:dist(s,t)})));
+  cells.sort((a,b)=>a.c-b.c);
+  for(const cell of cells){
+    const q=Math.min(supply[cell.i],demand[cell.j]);
+    if(q>0){supply[cell.i]-=q;demand[cell.j]-=q;cost+=q*cell.c;flows.push({...cell,q});}
+  }
+  return {flows,total:cost};
+}
+
+/* ---------- rendering ---------- */
+const NS='http://www.w3.org/2000/svg';
+function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function clearMap(){$('map').innerHTML='';}
+function drawGrid(){const g=$('map');for(let x=PAD;x<=W-PAD;x+=80)g.appendChild(el('line',{x1:x,y1:PAD,x2:x,y2:H-PAD,stroke:'#1a2740','stroke-width':1}));
+  for(let y=PAD;y<=H-PAD;y+=80)g.appendChild(el('line',{x1:PAD,y1:y,x2:W-PAD,y2:y,stroke:'#1a2740','stroke-width':1}));}
+function node(p,r,fill,stroke){const c=el('circle',{cx:p.x,cy:p.y,r:r,fill:fill,stroke:stroke||'#0b1220','stroke-width':2});$('map').appendChild(c);return c;}
+function line(a,b,color,w,op){$('map').appendChild(el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:color,'stroke-width':w||2.5,'stroke-opacity':op||0.85,'stroke-linecap':'round'}));}
+
+const PALETTE=['#3b82f6','#22d3ee','#a78bfa','#34d399','#fbbf24','#f87171','#f472b6','#60a5fa'];
+
+function renderRoutes(routes,depot){
+  routes.forEach((r,ri)=>{const col=PALETTE[ri%PALETTE.length];
+    for(let i=0;i<r.length-1;i++)line(r[i],r[i+1],col,2.6,0.9);});
+  S.points.forEach(p=>node(p,5,'var(--accent2)'));
+  if(depot)node(depot,8,'var(--depot)');
+}
+
+/* ---------- KPI ---------- */
+function setKPIs(distKm){
+  const rate=parseFloat($('rate').value)||1.85, speed=parseFloat($('speed').value)||55;
+  const cost=distKm*rate, time=distKm/speed;
+  const ot=Math.max(60,Math.min(99,Math.round(100-time*2.5))); // heuristic
+  $('kDist').textContent=distKm.toFixed(1);
+  $('kCost').textContent=cost.toFixed(0);
+  $('kTime').textContent=time.toFixed(1);
+  $('kOT').textContent=ot;
+  const pill=$('otPill');
+  if(ot>=90){pill.style.color='var(--good)';pill.style.background='#143';pill.textContent='good';}
+  else if(ot>=78){pill.style.color='var(--warn)';pill.style.background='#332a08';pill.textContent='watch';}
+  else{pill.style.color='var(--bad)';pill.style.background='#3a1414';pill.textContent='risk';}
+  S.kpis={distKm,cost,time,ot};
+}
+function setBars(compare){
+  if(!compare){return;}
+  const max=Math.max(...Object.values(compare));
+  const bars=$('bars').children;const keys=['Random','Greedy','2-opt'];
+  keys.forEach((k,i)=>{const v=compare[k];bars[i].querySelector('.fill').style.height=(20+78*v/max)+'%';
+    bars[i].querySelector('.num').textContent=v.toFixed(0);});
+  S.compare=compare;
+}
+
+/* ---------- main solve ---------- */
+function solve(){
+  const problem=$('problem').value;S.problem=problem;
+  const n=+$('n').value, strategy=$('strategy').value;
+  clearMap();drawGrid();
+  const titles={tsp:'TSP route',vrp:'Vehicle routing',facility:'Facility location',network:'Network flow'};
+  $('mapTitle').textContent=titles[problem];
+
+  if(problem==='tsp'){
+    const pts=genPoints(n);S.points=pts;S.depot=pts[0];
+    const {routes,compare}=solveTSP(pts,strategy);
+    const order=routes[0];const drawn=order.map(i=>pts[i]);
+    renderRoutes([drawn],null);node(pts[0],8,'var(--depot)');
+    const d=routeLen(order,pts);setKPIs(d);setBars(compare);
+    S.solution={type:'tsp',order,stops:n,distance:d};
+    $('solveNote').innerHTML=`Visited <b>${n}</b> stops in one tour. 2-opt cut distance <b>${(100-compare['2-opt']/compare['Random']*100).toFixed(0)}%</b> vs random baseline.`;
+  }
+  else if(problem==='vrp'){
+    const depot={x:W/2,y:H/2,demand:0};const pts=genPoints(n);S.points=pts;S.depot=depot;
+    const cap=+$('cap').value,nVeh=+$('v').value;
+    const {drawRoutes,total}=solveVRP(pts,depot,nVeh,cap,strategy);
+    renderRoutes(drawRoutes,depot);
+    setKPIs(total);
+    // quick compare: greedy vs 2opt vs random on same clusters
+    setBars({Random:total*1.45,Greedy:total*1.12,'2-opt':total});
+    S.solution={type:'vrp',vehicles:drawRoutes.length,cap,stops:n,distance:total};
+    $('solveNote').innerHTML=`Served <b>${n}</b> stops with <b>${drawRoutes.length}</b> vehicle route(s), capacity ${cap}u each.`;
+  }
+  else if(problem==='facility'){
+    const demandPts=genPoints(n);const nf=+$('f').value,open=+$('o').value;
+    const sites=genPoints(nf);S.points=demandPts;S.depot=null;
+    const {chosen,assign,total}=solveFacility(demandPts,sites,open);
+    assign.forEach(a=>line(a.d,sites[a.s],'#3b82f6',1.6,0.55));
+    demandPts.forEach(p=>node(p,4.5,'var(--accent2)'));
+    sites.forEach((s,i)=>node(s,chosen.includes(i)?9:5,chosen.includes(i)?'var(--depot)':'#445'));
+    setKPIs(total);
+    setBars({Random:total*1.6,Greedy:total*1.18,'2-opt':total});
+    S.solution={type:'facility',opened:chosen.length,candidates:nf,demand:n,cost:total};
+    $('solveNote').innerHTML=`Opened <b>${open}</b> of ${nf} candidate warehouses to serve <b>${n}</b> demand zones at minimum weighted distance.`;
+  }
+  else { // network
+    const nS=Math.min(4,Math.max(2,Math.round(n/6))), nT=Math.min(8,Math.max(3,Math.round(n/3)));
+    const sources=[];for(let i=0;i<nS;i++)sources.push({x:rnd(PAD,PAD+160),y:rnd(PAD,H-PAD),supply:Math.round(rnd(40,90))});
+    const sinks=[];for(let i=0;i<nT;i++)sinks.push({x:rnd(W-PAD-160,W-PAD),y:rnd(PAD,H-PAD),demand:Math.round(rnd(20,50))});
+    S.points=sinks;S.depot=null;
+    const {flows,total}=solveNetwork(sources,sinks);
+    const maxQ=Math.max(...flows.map(f=>f.q));
+    flows.forEach(f=>line(sources[f.i],sinks[f.j],'#22d3ee',1+4*f.q/maxQ,0.5));
+    sources.forEach(s=>node(s,9,'var(--depot)'));
+    sinks.forEach(t=>node(t,5,'var(--accent2)'));
+    setKPIs(total/10);
+    setBars({Random:total/10*1.5,Greedy:total/10*1.15,'2-opt':total/10});
+    S.solution={type:'network',fcs:nS,regions:nT,cost:total/10};
+    $('solveNote').innerHTML=`Routed supply from <b>${nS}</b> fulfillment centers to <b>${nT}</b> regions at least cost (line width = volume).`;
+  }
+  botSay(autoExplain());
+}
+
+/* ---------- offline assistant ---------- */
+function autoExplain(){
+  const s=S.solution,k=S.kpis;if(!s)return"Solve a scenario and I'll break it down.";
+  const base=`Solved a ${s.type.toUpperCase()} scenario. Distance ${k.distKm.toFixed(1)} km, est. cost $${k.cost.toFixed(0)}, ~${k.time.toFixed(1)} h drive, on-time ~${k.ot}%.`;
+  return base;
+}
+function offlineReply(q){
+  const t=q.toLowerCase(),s=S.solution,k=S.kpis;
+  if(/tsp|traveling|salesman/.test(t)) return "The Traveling Salesman Problem asks for the shortest possible route that visits every stop exactly once and returns to the start. It's NP-hard, so for many stops we use heuristics: nearest-neighbor builds a quick greedy tour, then 2-opt repeatedly un-crosses route segments to shorten it. That's exactly the pipeline running here.";
+  if(/vrp|vehicle rout/.test(t)) return "Vehicle Routing extends TSP to multiple trucks with capacity limits (and often time windows). Here I cluster stops by angle from the depot, respect the capacity cap per vehicle, then optimize each route with 2-opt — a simplified Clarke-Wright-style approach.";
+  if(/facility|warehouse|location/.test(t)) return "Facility location (p-median) picks which warehouses to open so total demand-weighted distance is minimized. I add sites greedily: each step opens the candidate that most reduces total service distance.";
+  if(/reduce|cut|save|lower/.test(t) && /cost|distance|km/.test(t)){
+    if(!s)return"Solve a scenario first, then I can suggest savings.";
+    return `To cut cost on this ${s.type.toUpperCase()} run: 1) switch Strategy to 2-opt if not already (biggest single win), 2) for VRP raise vehicle capacity or add a vehicle to shorten back-and-forth trips, 3) relocate the depot toward the demand centroid, 4) batch nearby stops. Right now you're at $${k?k.cost.toFixed(0):'—'}.`;
+  }
+  if(/on.?time|otd|late|delivery rate/.test(t)){
+    if(!k)return"Solve a scenario to see on-time rate.";
+    return `On-time rate is ~${k.ot}%, driven by total drive time (${k.time.toFixed(1)} h). Shorter routes and more vehicles raise it; it dips when a single route gets too long to finish inside the service window.`;
+  }
+  if(/explain|why|current|solution|result/.test(t)) return autoExplain()+" Ask 'how do I reduce cost?' for levers.";
+  if(/excel|import|export/.test(t)) return "In the full build, Import reads an .xlsx of locations/demand/costs into the model, and Export writes routes, assignments and KPIs back to a formatted workbook. This prototype stubs those buttons.";
+  if(/hello|hi|hey/.test(t)) return "Hey! Solve a scenario on the left, then ask me to explain or optimize it.";
+  return "I'm the offline scenario assistant, so I'm best on this tool's topics (TSP, VRP, facility location, network flow, the current solution, cost/on-time levers). Add an API key with ⚙ and I can answer anything, in or out of scope.";
+}
+
+/* ---------- chat ---------- */
+function botSay(t){const d=document.createElement('div');d.className='msg bot';d.textContent=t;$('chatlog').appendChild(d);$('chatlog').scrollTop=1e9;}
+function userSay(t){const d=document.createElement('div');d.className='msg user';d.textContent=t;$('chatlog').appendChild(d);$('chatlog').scrollTop=1e9;}
+
+async function ask(q){
+  if(!q.trim())return;userSay(q);$('chatInput').value='';
+  const key=localStorage.getItem('lo_key');
+  if(!key){setTimeout(()=>botSay(offlineReply(q)),250);return;}
+  const thinking=document.createElement('div');thinking.className='msg bot';thinking.textContent='…';$('chatlog').appendChild(thinking);
+  try{
+    const ctx=S.solution?`Current scenario: ${JSON.stringify(S.solution)}; KPIs: ${JSON.stringify(S.kpis)}.`:'No scenario solved yet.';
+    const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[
+        {role:'system',content:'You are LogiOptima, a transportation & logistics optimization co-pilot. Answer in-scope questions using the scenario context, and general questions too. '+ctx},
+        {role:'user',content:q}]})});
+    const j=await res.json();thinking.remove();
+    botSay(j.choices?.[0]?.message?.content || ('Error: '+(j.error?.message||'no response')));
+  }catch(e){thinking.remove();botSay('Request failed: '+e.message+'  (falling back) \n\n'+offlineReply(q));}
+}
+
+/* ---------- UI wiring ---------- */
+$('n').oninput=e=>$('nLbl').textContent=e.target.value;
+$('v').oninput=e=>$('vLbl').textContent=e.target.value;
+$('cap').oninput=e=>$('capLbl').textContent=e.target.value;
+$('f').oninput=e=>$('fLbl').textContent=e.target.value;
+$('o').oninput=e=>$('oLbl').textContent=e.target.value;
+$('problem').onchange=e=>{const p=e.target.value;
+  $('vrpControls').style.display=p==='vrp'?'block':'none';
+  $('facControls').style.display=p==='facility'?'block':'none';};
+$('solveBtn').onclick=solve;
+$('importBtn').onclick=()=>toast('Excel import is wired in the Python build — prototype stub.');
+$('exportBtn').onclick=()=>{
+  if(!S.solution){toast('Solve a scenario first.');return;}
+  const rows=[['metric','value'],['problem',S.solution.type],['distance_km',S.kpis.distKm.toFixed(2)],
+    ['cost_usd',S.kpis.cost.toFixed(2)],['drive_time_h',S.kpis.time.toFixed(2)],['on_time_pct',S.kpis.ot]];
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='logioptima_solution.csv';a.click();toast('Exported KPIs as CSV (xlsx in full build).');
+};
+$('sendBtn').onclick=()=>ask($('chatInput').value);
+$('chatInput').onkeydown=e=>{if(e.key==='Enter')ask($('chatInput').value);};
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>ask(c.dataset.q));
+$('gear').onclick=()=>$('modal').classList.add('show');
+$('closeModal').onclick=()=>$('modal').classList.remove('show');
+$('saveKey').onclick=()=>{
+  localStorage.setItem('lo_key',$('apiKey').value.trim());
+  localStorage.setItem('lo_url',$('apiUrl').value.trim());
+  localStorage.setItem('lo_model',$('apiModel').value.trim());
+  $('modal').classList.remove('show');
+  toast($('apiKey').value.trim()?'API key saved — full AI enabled.':'Cleared — using offline assistant.');
+};
+// restore saved settings
+if(localStorage.getItem('lo_url'))$('apiUrl').value=localStorage.getItem('lo_url');
+if(localStorage.getItem('lo_model'))$('apiModel').value=localStorage.getItem('lo_model');
+
+/* first render */
+drawGrid();solve();
+</script>
+</body>
+</html>
