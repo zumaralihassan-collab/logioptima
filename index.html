@@ -25,6 +25,15 @@
     --air:#a78bfa; --ocean:#22d3ee; --road:#fbbf24; --rail:#34d399; --purple:#a78bfa;
     --shadow:0 6px 24px rgba(0,0,0,.4); --r:12px;
   }
+  /* Light theme: override neutral palette + accent2; keep vivid mode hues. Toggled via body.light (see toggleTheme). */
+  body.light{
+    --bg:#eef2f9; --panel:#ffffff; --panel2:#f1f4fa; --line:#d3dae8;
+    --txt:#0f172a; --muted:#566174; --accent2:#0891b2;
+    --shadow:0 4px 18px rgba(15,23,42,.10);
+  }
+  body.light header{background:linear-gradient(90deg,#ffffff,#e8f0fb)}
+  .iconbtn{margin-left:8px;cursor:pointer;font-size:13px;color:var(--accent2);border:1px solid var(--line);padding:4px 9px;border-radius:20px;background:var(--panel);line-height:1.2}
+  .iconbtn:hover{border-color:var(--accent2)}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45}
   header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:linear-gradient(90deg,#0a0e14,#0f1830);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
@@ -196,6 +205,7 @@
     <button data-view="fc">🏭 Fulfillment Ops</button>
   </nav>
   <div class="badge">AI-Assisted · Live</div>
+  <button class="iconbtn" id="themeBtn" aria-label="Switch to light theme" title="Toggle light / dark theme" onclick="toggleTheme()">◐</button>
 </header>
 
 <div class="layout">
@@ -845,6 +855,11 @@ var CURVIEW='control';
 const LS_SHIP='lts_shipments_v1';
 function saveShipments(){try{localStorage.setItem(LS_SHIP,JSON.stringify(SHIPMENTS));}catch(e){}}
 function loadShipments(){try{const j=JSON.parse(localStorage.getItem(LS_SHIP)||'null');return (Array.isArray(j)&&j.length&&j[0]&&j[0].id)?j:null;}catch(e){return null;}}
+/* Theme (light/dark) — toggles body.light, persists to localStorage('lts_theme'), keeps theme-color meta in sync. */
+const LS_THEME='lts_theme';
+function applyTheme(t){const light=t==='light';document.body.classList.toggle('light',light);const b=$('themeBtn');if(b){b.textContent=light?'☀':'◐';b.setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');}const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',light?'#eef2f9':'#0a0e14');}
+function toggleTheme(){const t=document.body.classList.contains('light')?'dark':'light';try{localStorage.setItem(LS_THEME,t);}catch(e){}applyTheme(t);}
+function initTheme(){let t='dark';try{t=localStorage.getItem(LS_THEME)||'dark';}catch(e){}applyTheme(t);}
 function resetShipments(){try{localStorage.removeItem(LS_SHIP);}catch(e){}genShipments();saveShipments();renderControl();if(typeof renderPerf==='function')renderPerf();if(typeof renderCost==='function')renderCost();toast('Regenerated a fresh shipment register.');}
 function encodeState(){const p=new URLSearchParams();p.set('v',CURVIEW||'control');
   const q=($('ctSearch')&&$('ctSearch').value)||'';if(q)p.set('q',q);
@@ -1625,6 +1640,7 @@ function showView(name){CURVIEW=name;document.querySelectorAll('nav button').for
 function wireNav(){document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));}
 
 window.addEventListener('load',()=>{
+  initTheme();
   const _sv=loadShipments();if(_sv){SHIPMENTS=_sv;}else{genShipments();saveShipments();}genLeadtime();genExtra();
   initCTMap();initMap();
   fillCommodity();
