@@ -78,6 +78,10 @@ def audit(fp):
         "Print / PDF export": "window.print" in low.replace(" ", ""),
         "Branded Excel export": "brandedexport" in low,
         "Robust import validation": "validateimport" in low,
+        "Sustainability / carbon module": "view-sustain" in low and "rendersustain" in low,
+        "Risk & resilience module": "view-risk" in low and "rundisruption" in low,
+        "Demand & S&OP forecasting": "view-demand" in low and "function forecast" in low,
+        "Fulfillment Ops (FC network)": "view-fc" in low and "renderfc" in low,
     }
     for name, present in feat.items():
         add("feat:" + name, "Features", 3, present, name, "Implement '" + name + "'")
