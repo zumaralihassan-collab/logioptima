@@ -4,11 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Zumar's Logic-tics Stop — Global Transportation & Logistics Optimization</title>
+<meta name="description" content="Zumar's Logic-tics Stop: an AI-assisted logistics control tower — multimodal shipment tracking, predictive ETA & disruption risk, carrier scorecards, cost intelligence, an LP optimization studio, and a global crude-shipping network." />
+<meta name="theme-color" content="#0a0e14" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Zumar's Logic-tics Stop" />
+<meta property="og:description" content="AI-assisted global transportation & logistics optimization — control tower, cost intelligence, optimization studio, crude network, and Excel I/O." />
+<meta property="og:url" content="https://zumaralihassan-collab.github.io/logioptima/" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b82f6'/%3E%3Ctext x='16' y='23' font-size='20' font-family='Arial' font-weight='bold' text-anchor='middle' fill='%2306121f'%3EZ%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  :focus-visible{outline:2px solid #22d3ee;outline-offset:2px;border-radius:6px}
   :root{
     --bg:#0a0e14; --panel:#121821; --panel2:#1a212c; --line:#283341;
     --txt:#e6edf3; --muted:#8b97a7; --accent:#3b82f6; --accent2:#22d3ee;
@@ -166,14 +175,15 @@
   .dl{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;font-size:13px}
   .dl .lbl{color:var(--muted)}
   @media (max-width:1100px){.layout{grid-template-columns:1fr}.chat{position:static;height:auto;border-left:none;border-top:1px solid var(--line)}.grid2,.grid3,.grid4{grid-template-columns:1fr 1fr}}
-  @media print{header,.chat,.filterbar,nav,.badge{display:none!important}.layout{grid-template-columns:1fr}.view{display:none!important}.view.active{display:block!important}}
+  @media print{header,.chat,.filterbar,nav,.badge{display:none!important}.layout{grid-template-columns:1fr}.view{display:none!important}.view.active{display:block!important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Z</div>
   <div><h1>Zumar's Logic-tics Stop</h1><div class="tag">Global Transportation &amp; Logistics Optimization</div></div>
-  <nav>
+  <nav aria-label="Modules">
     <button class="active" data-view="control">🛰️ Control Tower</button>
     <button data-view="perf">📊 Performance</button>
     <button data-view="cost">💸 Cost Intelligence</button>
@@ -189,7 +199,7 @@
 
 <!-- ===================== CONTROL TOWER (HERO) ===================== -->
 <div class="view active" id="view-control">
-  <div class="grid4" id="ctKpis"></div>
+  <div class="grid4" id="ctKpis" aria-live="polite"></div>
   <div class="grid2" style="grid-template-columns:1fr 340px">
     <div class="card">
       <h2 id="ctMapHead">Live multimodal network <span class="sub">ocean · air · rail · road — click an arc or row for detail</span></h2>
@@ -204,24 +214,27 @@
     </div>
     <div class="card" style="display:flex;flex-direction:column">
       <h2>⚠ Exception Inbox <span class="sub">alerts → actions</span></h2>
-      <div class="inbox" id="excInbox"></div>
+      <div class="inbox" id="excInbox" role="list" aria-label="Exception inbox"></div>
     </div>
   </div>
   <div class="card">
     <h2>Shipment register <span class="sub">predictive ETA &amp; disruption risk per shipment</span></h2>
     <div class="filterbar">
-      <input type="text" id="ctSearch" placeholder="🔍 Search ID, lane, carrier, commodity, customer…" style="min-width:240px;flex:1" />
+      <input type="text" id="ctSearch" placeholder="🔍 Search ID, lane, carrier, commodity, customer…" style="min-width:240px;flex:1" aria-label="Search shipments by ID, lane, carrier, commodity, or customer" />
       <select id="ctMode"><option value="">All modes</option><option>Ocean</option><option>Air</option><option>Road</option><option>Rail</option></select>
       <select id="ctStatus"><option value="">All statuses</option><option>In Transit</option><option>Delivered</option><option>Customs Hold</option><option>Exception</option><option>Delayed</option><option>At Origin</option></select>
       <select id="ctCarrier"><option value="">All carriers</option></select>
       <button class="ghost btn" id="ctTemplate">⬇ Template</button>
       <button class="ghost btn" id="ctImportBtn">⬆ Import</button>
       <button class="btn" id="ctExport">⬇ Export Excel</button>
+      <button class="ghost btn" id="ctPdf" aria-label="Export the Control Tower to PDF">🖨 PDF</button>
+      <button class="ghost btn" id="ctShare" aria-label="Copy a shareable link to this view">🔗 Share</button>
+      <button class="ghost btn" id="ctReset" aria-label="Regenerate a fresh shipment register">↺ Reset</button>
       <input type="file" id="ctFile" accept=".xlsx,.xls,.csv" style="display:none" />
     </div>
     <div style="overflow:auto;max-height:460px;margin-top:12px">
       <table>
-        <thead><tr><th>ID</th><th>Lane</th><th>Mode</th><th>Carrier</th><th>Commodity</th><th>ETA</th><th>Pred. ETA</th><th>Risk</th><th>Status</th><th>OTIF</th></tr></thead>
+        <thead><tr><th scope="col">ID</th><th scope="col">Lane</th><th scope="col">Mode</th><th scope="col">Carrier</th><th scope="col">Commodity</th><th scope="col">ETA</th><th scope="col">Pred. ETA</th><th scope="col">Risk</th><th scope="col">Status</th><th scope="col">OTIF</th></tr></thead>
         <tbody id="ctBody"></tbody>
       </table>
     </div>
@@ -427,7 +440,7 @@
         </div>
         <label style="margin-top:12px">Add a city or address</label>
         <div class="ac">
-          <input type="text" id="cityInput" placeholder="e.g. Singapore, Rotterdam, 221B Baker St…" autocomplete="off" />
+          <input type="text" id="cityInput" placeholder="e.g. Singapore, Rotterdam, 221B Baker St…" autocomplete="off" aria-label="Search for a city or address to add" />
           <div class="aclist" id="aclist"></div>
         </div>
         <div class="hint" id="addHint">Type to search the built-in list; press Enter to geocode anything not found.</div>
@@ -569,7 +582,7 @@
 
 <!-- AI COPILOT -->
 <div class="chat" id="chatPanel">
-  <div class="chathead"><h2>AI Copilot</h2><span class="live" id="liveBadge">offline</span><button class="gear" id="gear" title="API settings">⚙</button></div>
+  <div class="chathead"><h2>AI Copilot</h2><span class="live" id="liveBadge">offline</span><button class="gear" id="gear" title="API settings" aria-label="Open AI copilot API settings">⚙</button></div>
   <div id="chatlog"><div class="msg bot">Hi Zumar 👋 I'm your logistics copilot across the whole suite — Control Tower, performance &amp; carriers, cost intelligence, the solver, crude shipping, ERP lead times. Ask me things like "which lanes bled money?", "explain this shipment's risk", or "interpret the sensitivity report". Add your API key (⚙) for full real-time AI.</div></div>
   <div class="chips" id="chips">
     <div class="chip" data-q="Summarize my operations — OTIF, exceptions, and biggest risks right now">Ops summary</div>
@@ -577,7 +590,7 @@
     <div class="chip" data-q="Which carrier is breaching SLA the most and what should I do?">SLA breaches</div>
     <div class="chip" data-q="What happens to crude routing if the Strait of Hormuz closes?">Hormuz risk</div>
   </div>
-  <div class="chatin"><input type="text" id="chatInput" placeholder="Ask anything…" /><button id="sendBtn">Send</button></div>
+  <div class="chatin"><input type="text" id="chatInput" placeholder="Ask anything…" aria-label="Message the AI copilot" /><button id="sendBtn" aria-label="Send message to AI copilot">Send</button></div>
 </div>
 </div>
 
@@ -749,6 +762,46 @@ const stClass=s=>'st-'+s.replace(/\s/g,'');
 /* ---- Excel I/O ---- */
 function exportXlsx(filename,sheets){const wb=XLSX.utils.book_new();sheets.forEach(s=>{const ws=Array.isArray(s.rows[0])?XLSX.utils.aoa_to_sheet(s.rows):XLSX.utils.json_to_sheet(s.rows);if(s.w)ws['!cols']=s.w;XLSX.utils.book_append_sheet(wb,ws,s.name);});XLSX.writeFile(wb,filename);}
 function importXlsx(file,cb){const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];cb(XLSX.utils.sheet_to_json(ws,{defval:''}));}catch(err){toast('Import failed: '+err.message);}};r.readAsArrayBuffer(file);}
+// Validate imported rows against required columns; returns {ok, missing, valid, skipped}
+function validateImport(rows,required){
+  if(!rows.length)return {ok:false,missing:[],valid:[],skipped:0,reason:'empty'};
+  const cols=Object.keys(rows[0]||{});
+  const missing=required.filter(c=>!cols.includes(c));
+  if(missing.length)return {ok:false,missing,valid:[],skipped:0};
+  let skipped=0;const valid=rows.filter(r=>{const good=required.every(c=>String(r[c]!=null?r[c]:'').trim()!=='');if(!good)skipped++;return good;});
+  return {ok:valid.length>0,missing:[],valid,skipped};
+}
+// Branded Excel export: prepends an "About" cover sheet and auto-sizes columns.
+function brandedExport(filename,sheets,title){
+  const cover={name:'About',rows:[
+    ["Zumar's Logic-tics Stop"],[title||'Logistics export'],
+    ['Generated',new Date().toLocaleString()],
+    ['Source','zumaralihassan-collab.github.io/logioptima'],
+    ['Note','Figures are illustrative planning estimates, not quotes.']],w:[{wch:22},{wch:50}]};
+  const sized=sheets.map(s=>{if(!s.w&&s.rows&&s.rows.length){const keys=Array.isArray(s.rows[0])?s.rows[0]:Object.keys(s.rows[0]);s.w=keys.map(k=>({wch:Math.min(30,Math.max(10,String(k).length+4))}));}return s;});
+  exportXlsx(filename,[cover,...sized]);
+}
+
+/* ---- persistence + shareable state ---- */
+var CURVIEW='control';
+const LS_SHIP='lts_shipments_v1';
+function saveShipments(){try{localStorage.setItem(LS_SHIP,JSON.stringify(SHIPMENTS));}catch(e){}}
+function loadShipments(){try{const j=JSON.parse(localStorage.getItem(LS_SHIP)||'null');return (Array.isArray(j)&&j.length&&j[0]&&j[0].id)?j:null;}catch(e){return null;}}
+function resetShipments(){try{localStorage.removeItem(LS_SHIP);}catch(e){}genShipments();saveShipments();renderControl();if(typeof renderPerf==='function')renderPerf();if(typeof renderCost==='function')renderCost();toast('Regenerated a fresh shipment register.');}
+function encodeState(){const p=new URLSearchParams();p.set('v',CURVIEW||'control');
+  const q=($('ctSearch')&&$('ctSearch').value)||'';if(q)p.set('q',q);
+  [['ctMode','mode'],['ctStatus','status'],['ctCarrier','carrier']].forEach(([id,k])=>{const el=$(id);if(el&&el.value)p.set(k,el.value);});
+  return p.toString();}
+function syncHash(){try{history.replaceState(null,'','#'+encodeState());}catch(e){}}
+function copyShareLink(){const url=location.origin+location.pathname+'#'+encodeState();
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(()=>toast('Share link copied.'),()=>toast(url));else toast(url);}
+function applyHash(){if(!location.hash||location.hash.length<2)return false;
+  const p=new URLSearchParams(location.hash.slice(1));
+  const q=p.get('q');if(q&&$('ctSearch'))$('ctSearch').value=q;
+  [['mode','ctMode'],['status','ctStatus'],['carrier','ctCarrier']].forEach(([k,id])=>{const v=p.get(k);if(v&&$(id))$(id).value=v;});
+  const v=p.get('v');if(v&&$('view-'+v))showView(v);
+  if($('ctBody'))renderCTTable();
+  return true;}
 
 /* ---- charts ---- */
 const CHARTS={};
@@ -857,7 +910,7 @@ function severityOf(s){if(s.status==='Exception'||s.risk>=70)return'r';if(s.stat
 function renderInbox(){const items=active().filter(s=>s.exc||s.risk>=55).sort((a,b)=>b.risk-a.risk);
   if(!items.length){$('excInbox').innerHTML='<div class="hint">No open exceptions — network is clean. 🎉</div>';return;}
   $('excInbox').innerHTML=items.map(s=>{const sev=severityOf(s);const delay=Math.max(0,Math.round((parseD(s.predEta)-parseD(s.eta))/864e5));
-    return `<div class="exc sev-${sev}" data-id="${s.id}">
+    return `<div class="exc sev-${sev}" data-id="${s.id}" role="listitem">
       <div class="top"><span class="ttl">${esc(s.exc||'Elevated risk')}</span>${riskBadge(s.risk)}</div>
       <div class="meta">${s.id} · ${s.o} → ${s.d} · ${s.mode} · ${esc(s.carrier)}${delay>0?` · <b style="color:var(--warn)">+${delay}d ETA slip</b>`:''}${s.dndDays>0?` · D&D ${f$(s.dndCost)}`:''}</div>
       <div class="acts">
@@ -875,14 +928,14 @@ function excAction(act,id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;
   if(act==='switch'){const alts=CARRIERS.filter(c=>c.mode===s.mode&&c.name!==s.carrier).sort((a,b)=>b.rel-a.rel);if(alts.length){const old=s.carrier;s.carrier=alts[0].name;s.risk=Math.max(8,s.risk-12);s.exc=null;if(s.status==='Exception')s.status='In Transit';toast(`Carrier switched ${old} → ${s.carrier}.`);botSay(`🔁 Switched ${id} from ${old} to ${s.carrier} (higher reliability ${(alts[0].rel*100).toFixed(0)}%). Risk now ${s.risk}.`);}}
   if(act==='dnd'){const rec=s.dndCost;s.dndCost=0;s.dndDays=0;s.exc=null;toast(`D&D dispute filed — ${f$(rec)} flagged for recovery.`);botSay(`📝 Filed a detention & demurrage dispute on ${id}: ${f$(rec)} flagged for recovery from the carrier/terminal.`);}
   if(act==='dismiss'){s.exc=null;if(s.status==='Exception'||s.status==='Delayed'||s.status==='Customs Hold')s.status='In Transit';s.risk=Math.max(6,Math.round(s.risk*0.5));toast(`${id} resolved.`);}
-  renderControl();}
+  saveShipments();renderControl();}
 
 function ctFiltered(){const q=($('ctSearch').value||'').toLowerCase(),m=$('ctMode').value,st=$('ctStatus').value,ca=$('ctCarrier').value;
   return SHIPMENTS.filter(s=>(!m||s.mode===m)&&(!st||s.status===st)&&(!ca||s.carrier===ca)&&(!q||[s.id,s.o,s.d,s.carrier,s.commodity,s.customer].join(' ').toLowerCase().includes(q)));}
 function renderCTTable(){const list=ctFiltered();
   $('ctBody').innerHTML=list.map(s=>{const slip=parseD(s.predEta)>parseD(s.eta);
-    return `<tr class="clk" data-id="${s.id}"><td><b>${s.id}</b></td><td>${s.o} → ${s.d}</td><td><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span></td><td>${esc(s.carrier)}</td><td>${s.commodity}</td><td>${s.eta}</td><td style="color:${slip?'var(--warn)':'var(--muted)'}">${s.predEta}</td><td>${riskBadge(s.risk)}</td><td><span class="st ${stClass(s.status)}">${s.status}</span></td><td>${s.status==='Delivered'?(s.onTime&&s.inFull?'<span class="pill rag-g">OTIF</span>':s.onTime?'<span class="pill rag-a">late-in-full</span>':'<span class="pill rag-r">miss</span>'):'—'}</td></tr>`;}).join('');
-  $('ctBody').querySelectorAll('tr').forEach(r=>r.onclick=()=>openShipment(r.dataset.id));
+    return `<tr class="clk" data-id="${s.id}" tabindex="0" role="button" aria-label="Open shipment ${s.id}"><td><b>${s.id}</b></td><td>${s.o} → ${s.d}</td><td><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span></td><td>${esc(s.carrier)}</td><td>${s.commodity}</td><td>${s.eta}</td><td style="color:${slip?'var(--warn)':'var(--muted)'}">${s.predEta}</td><td>${riskBadge(s.risk)}</td><td><span class="st ${stClass(s.status)}">${s.status}</span></td><td>${s.status==='Delivered'?(s.onTime&&s.inFull?'<span class="pill rag-g">OTIF</span>':s.onTime?'<span class="pill rag-a">late-in-full</span>':'<span class="pill rag-r">miss</span>'):'—'}</td></tr>`;}).join('');
+  $('ctBody').querySelectorAll('tr').forEach(r=>{r.onclick=()=>openShipment(r.dataset.id);r.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();openShipment(r.dataset.id);}};});
   $('ctNote').innerHTML=`Showing <b>${list.length}</b> of ${SHIPMENTS.length} shipments · ${active().length} active · ${active().filter(s=>s.exc).length} flagged.`;}
 
 function openShipment(id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;const inc=INC[s.incoterm];
@@ -908,7 +961,7 @@ function openShipment(id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;cons
       <button class="mini" data-act="dnd" data-id="${s.id}">📝 D&D dispute</button>
       <button class="mini" id="ctAsk">🤖 Ask copilot</button>
     </div>`;
-  $('ctStatusSel').onchange=e=>{s.status=e.target.value;toast(`${id} → ${s.status}`);renderControl();};
+  $('ctStatusSel').onchange=e=>{s.status=e.target.value;toast(`${id} → ${s.status}`);saveShipments();renderControl();};
   $('ctDetail').querySelectorAll('button[data-act]').forEach(b=>b.onclick=()=>{excAction(b.dataset.act,b.dataset.id);$('ctModal').classList.remove('show');});
   $('ctAsk').onclick=()=>{$('ctModal').classList.remove('show');ask(`Explain shipment ${s.id} (${s.o}→${s.d}, ${s.mode}, ${s.carrier}), its ${s.risk} risk score and what I should do.`);};
   $('ctModal').classList.add('show');}
@@ -918,16 +971,22 @@ function renderControl(){ctKpiCards();renderInbox();renderCTTable();drawCTMap(SH
 /* control tower wiring */
 function ctExportRows(){return SHIPMENTS.map(s=>({ID:s.id,Origin:s.o,Destination:s.d,Mode:s.mode,Carrier:s.carrier,Commodity:s.commodity,HS:s.hs,Customer:s.customer,Incoterm:s.incoterm,ETD:s.etd,ETA:s.eta,PredictedETA:s.predEta,Status:s.status,RiskScore:s.risk,DistanceKm:s.dist,WeightKg:s.weightKg,Value:s.value,ShouldCost:s.should,Invoiced:s.invoiced,DnD_Cost:s.dndCost,CO2_kg:s.co2,Exception:s.exc||''}));}
 function wireControl(){
-  ['ctSearch','ctMode','ctStatus','ctCarrier'].forEach(id=>$(id).oninput=renderCTTable);
+  ['ctSearch','ctMode','ctStatus','ctCarrier'].forEach(id=>$(id).oninput=()=>{renderCTTable();syncHash();});
   $('ctCarrier').innerHTML='<option value="">All carriers</option>'+CARRIERS.map(c=>`<option>${c.name}</option>`).join('');
   $('ctClose').onclick=()=>$('ctModal').classList.remove('show');
-  $('ctExport').onclick=()=>{exportXlsx('logictics_shipments.xlsx',[{name:'Shipments',rows:ctExportRows()}]);toast('Exported shipments to Excel.');};
-  $('ctTemplate').onclick=()=>{exportXlsx('shipments_template.xlsx',[{name:'Shipments',rows:[{ID:'SHP-2001',Origin:'Shanghai',Destination:'Los Angeles',Mode:'Ocean',Carrier:'Maersk',Commodity:'Electronics',Incoterm:'FOB',ETD:'2026-06-01',ETA:'2026-06-22',Status:'In Transit',WeightKg:18000,Invoiced:9800}]}]);toast('Template downloaded.');};
+  $('ctExport').onclick=()=>{brandedExport('logictics_shipments.xlsx',[{name:'Shipments',rows:ctExportRows()}],'Shipment register export');toast('Exported shipments to Excel.');};
+  $('ctTemplate').onclick=()=>{brandedExport('shipments_template.xlsx',[{name:'Shipments',rows:[{ID:'SHP-2001',Origin:'Shanghai',Destination:'Los Angeles',Mode:'Ocean',Carrier:'Maersk',Commodity:'Electronics',HS:'8517',Customer:'Acme Retail',Incoterm:'FOB',ETD:'2026-06-01',ETA:'2026-06-22',PredictedETA:'2026-06-24',Status:'In Transit',RiskScore:28,DistanceKm:11400,WeightKg:18000,Value:540000,ShouldCost:9200,Invoiced:9800,DnD_Cost:0,CO2_kg:32000,Exception:''}]}],'Shipment import template');toast('Template downloaded — fill rows and Import.');};
   $('ctImportBtn').onclick=()=>$('ctFile').click();
-  $('ctFile').onchange=e=>{const f=e.target.files[0];if(!f)return;importXlsx(f,rows=>{if(!rows.length){toast('No rows found.');return;}
-    SHIPMENTS=rows.map((r,i)=>{const o=COORD[r.Origin]||{name:r.Origin,lat:0,lon:0},d=COORD[r.Destination]||{name:r.Destination,lat:0,lon:0};const mode=r.Mode||'Ocean';const dist=Math.round(r.DistanceKm||haversine(o,d));const wk=+r.WeightKg||10000;const should=Math.round(r.ShouldCost||shouldCost({dist,mode,weightKg:wk,fuel:18,acc:300,dray:mode==='Ocean'?600:0}));
+  $('ctFile').onchange=e=>{const f=e.target.files[0];if(!f)return;importXlsx(f,rows=>{
+    const vr=validateImport(rows,['ID','Origin','Destination']);
+    if(vr.missing.length){toast('Import is missing column(s): '+vr.missing.join(', ')+'. Download the Template for the exact headers.');return;}
+    if(!vr.ok){toast('No valid rows found — each needs ID, Origin and Destination.');return;}
+    SHIPMENTS=vr.valid.map((r,i)=>{const o=COORD[r.Origin]||{name:r.Origin,lat:0,lon:0},d=COORD[r.Destination]||{name:r.Destination,lat:0,lon:0};const mode=r.Mode||'Ocean';const dist=Math.round(r.DistanceKm||haversine(o,d));const wk=+r.WeightKg||10000;const should=Math.round(r.ShouldCost||shouldCost({dist,mode,weightKg:wk,fuel:18,acc:300,dray:mode==='Ocean'?600:0}));
       return{id:r.ID||('IMP-'+i),o:r.Origin,d:r.Destination,oc:o,dc:d,mode,carrier:r.Carrier||'—',commodity:r.Commodity||'General',hs:r.HS||'',customer:r.Customer||'—',incoterm:r.Incoterm||'FOB',dist,weightKg:wk,value:+r.Value||wk*10,etd:r.ETD||dstr(TODAY),eta:r.ETA||dstr(addDays(TODAY,20)),predEta:r.PredictedETA||r.ETA||dstr(addDays(TODAY,22)),actualDelivery:r.Status==='Delivered'?(r.ETA||dstr(TODAY)):null,slaTarget:25,planned:20,status:r.Status||'In Transit',onTime:r.Status==='Delivered',inFull:true,risk:+r.RiskScore||25,co2:+r.CO2_kg||Math.round(dist*wk/1000*MODESPEED[mode].co2/1000),should,invoiced:Math.round(r.Invoiced||should),freeDays:5,daysUsed:0,dndDays:0,dndCost:+r.DnD_Cost||0,exc:r.Exception||null,revenue:Math.round((r.Invoiced||should)*1.3)};});
-    toast(`Imported ${SHIPMENTS.length} shipments.`);renderControl();renderPerf&&renderPerf();renderCost&&renderCost();});};
+    saveShipments();toast(`Imported ${SHIPMENTS.length} shipments`+(vr.skipped?` (${vr.skipped} row(s) skipped)`:'')+'.');renderControl();renderPerf&&renderPerf();renderCost&&renderCost();});};
+  $('ctReset').onclick=resetShipments;
+  $('ctShare').onclick=copyShareLink;
+  $('ctPdf').onclick=()=>{showView('control');setTimeout(()=>window.print(),150);};
 }
 
 /* =========================================================================
@@ -1398,20 +1457,21 @@ function wireChat(){$('sendBtn').onclick=()=>ask($('chatInput').value);$('chatIn
 function wireCost(){$('smcRun').onclick=smcCompute;$('cRun').onclick=runCost;$('lcRun').onclick=runLanded;$('lcInco').onchange=e=>incoBoxRender(e.target.value);
   document.querySelectorAll('#ctsToggle button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#ctsToggle button').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderCts(b.dataset.dim);});}
 const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData};
-function showView(name){document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+name).classList.add('active');
+function showView(name){CURVIEW=name;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+name).classList.add('active');
   if(RENDER[name])RENDER[name]();
   if(name==='control'&&ctMap)setTimeout(()=>{ctMap.invalidateSize();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));},60);
-  if(name==='global'&&wmap)setTimeout(()=>wmap.invalidateSize(),60);}
+  if(name==='global'&&wmap)setTimeout(()=>wmap.invalidateSize(),60);syncHash();}
 function wireNav(){document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));}
 
 window.addEventListener('load',()=>{
-  genShipments();genLeadtime();
+  const _sv=loadShipments();if(_sv){SHIPMENTS=_sv;}else{genShipments();saveShipments();}genLeadtime();
   initCTMap();initMap();
   fillCommodity();
   wireNav();wireControl();wireCost();wireOpt();wireRouting();wirePlanner();wireGlobal();wireData();wireChat();
   loadTemplate('modemix');
   renderControl();renderPerf();renderCost();renderData();solveSandbox();
   EXAMPLE_ROUTE.forEach(nm=>{const c=CITIES.find(x=>x[0]===nm);if(c)locations.push({name:c[0],country:c[1],lat:c[2],lon:c[3],role:'stop'});});if(locations.length)locations[0].role='origin';renderLocList();drawMarkers();optimize();
+  applyHash();
 });
 </script>
 </body>
