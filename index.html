@@ -1657,23 +1657,43 @@ function renderRisk(){
   $('riskPlay').innerHTML=plays.map(p=>`<div class="kpi"><div class="k">${p[0]}</div><div class="sub2" style="margin-top:6px">${p[1]}</div></div>`).join('');
 }
 // --- Demand & S&OP ---
-function forecast(hist,h){const n=hist.length,P=12,seas=Array(P).fill(0),cnt=Array(P).fill(0),mean=avg(hist)||1;
+function forecast(hist,h){const n=hist.length,mean=avg(hist)||1;
+  if(!n)return {fit:[],fc:[],lo:[],hi:[],mape:0,bias:0,std:0,mean,method:'—',methods:[]};
+  // shared in-sample metrics (guard against zero actuals)
+  const _mape=fit=>{let s=0,c=0;hist.forEach((v,i)=>{if(v){s+=Math.abs((v-fit[i])/v);c++;}});return c?s/c*100:0;};
+  const _bias=fit=>{let s=0,c=0;hist.forEach((v,i)=>{if(v){s+=(fit[i]-v)/v;c++;}});return c?s/c*100:0;};
+  const _rstd=fit=>Math.sqrt(avg(hist.map((v,i)=>(v-fit[i])*(v-fit[i]))));
+  // method 1 — seasonal trend (deseasonalized linear regression)
+  const P=12,seas=Array(P).fill(0),cnt=Array(P).fill(0);
   hist.forEach((v,i)=>{seas[i%P]+=v/mean;cnt[i%P]++;});for(let i=0;i<P;i++)seas[i]=cnt[i]?seas[i]/cnt[i]:1;
   const des=hist.map((v,i)=>v/seas[i%P]);let sx=0,sy=0,sxx=0,sxy=0;des.forEach((y,i)=>{sx+=i;sy+=y;sxx+=i*i;sxy+=i*y;});
   const b=(n*sxy-sx*sy)/(n*sxx-sx*sx||1),a=(sy-b*sx)/n;
-  const fit=hist.map((v,i)=>(a+b*i)*seas[i%P]),res=hist.map((v,i)=>v-fit[i]),rstd=Math.sqrt(avg(res.map(r=>r*r)));
-  const fc=[],lo=[],hi=[];for(let k=0;k<h;k++){const i=n+k,f=(a+b*i)*seas[i%P];fc.push(Math.max(0,Math.round(f)));lo.push(Math.max(0,Math.round(f-1.64*rstd)));hi.push(Math.round(f+1.64*rstd));}
-  const mape=avg(hist.map((v,i)=>Math.abs((v-fit[i])/v)))*100,bias=avg(hist.map((v,i)=>(fit[i]-v)/v))*100;
-  return {fit,fc,lo,hi,mape,bias,std:rstd,mean};}
+  const fitS=hist.map((v,i)=>(a+b*i)*seas[i%P]),fcS=k=>(a+b*(n+k))*seas[(n+k)%P];
+  // method 2 — moving average (window w)
+  const w=Math.min(3,n)||1;
+  const fitM=hist.map((v,i)=>{if(!i)return hist[0];const s=Math.max(0,i-w);let q=0,c=0;for(let j=s;j<i;j++){q+=hist[j];c++;}return c?q/c:hist[0];});
+  let mq=0,mc=0;for(let j=Math.max(0,n-w);j<n;j++){mq+=hist[j];mc++;}const maLast=mc?mq/mc:mean,fcM=()=>maLast;
+  // method 3 — Holt linear (double exponential smoothing)
+  const al=0.5,be=0.3;let lv=hist[0],tr=n>1?hist[1]-hist[0]:0;const fitH=[hist[0]];
+  for(let i=1;i<n;i++){fitH.push(lv+tr);const nl=al*hist[i]+(1-al)*(lv+tr);tr=be*(nl-lv)+(1-be)*tr;lv=nl;}
+  const hLv=lv,hTr=tr,fcH=k=>hLv+(k+1)*hTr;
+  // pick the method with the lowest in-sample MAPE
+  const cands=[{name:'Seasonal trend',fit:fitS,gen:fcS},{name:'Moving average',fit:fitM,gen:fcM},{name:'Holt linear',fit:fitH,gen:fcH}];
+  cands.forEach(m=>m.mape=_mape(m.fit));
+  const best=cands.reduce((p,c)=>c.mape<p.mape?c:p);
+  const fit=best.fit,rstd=_rstd(fit),fc=[],lo=[],hi=[];
+  for(let k=0;k<h;k++){const f=best.gen(k);fc.push(Math.max(0,Math.round(f)));lo.push(Math.max(0,Math.round(f-1.64*rstd)));hi.push(Math.round(f+1.64*rstd));}
+  return {fit,fc,lo,hi,mape:_mape(fit),bias:_bias(fit),std:rstd,mean,method:best.name,methods:cands.map(m=>({name:m.name,mape:m.mape}))};}
 function renderDemand(){const com=$('dmCom').value||COMMODITIES[0].name,hist=DEMAND[com]||[],fc=forecast(hist,6);
   const labels=[];for(let i=0;i<hist.length+6;i++)labels.push('M'+(i+1));
   mkChart('chDemand',{type:'line',data:{labels,datasets:[
     {label:'History',data:hist.concat(Array(6).fill(null)),borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.08)',tension:.3,fill:true},
-    {label:'Forecast',data:Array(hist.length).fill(null).concat(fc.fc),borderColor:'#fbbf24',borderDash:[6,4],tension:.3},
+    {label:'Forecast — '+fc.method,data:Array(hist.length).fill(null).concat(fc.fc),borderColor:'#fbbf24',borderDash:[6,4],tension:.3},
     {label:'Upper 90%',data:Array(hist.length).fill(null).concat(fc.hi),borderColor:'rgba(251,191,36,.35)',pointRadius:0},
     {label:'Lower 90%',data:Array(hist.length).fill(null).concat(fc.lo),borderColor:'rgba(251,191,36,.35)',pointRadius:0}]},
     options:{plugins:{legend:{position:'bottom'}}}});
-  $('dmAcc').innerHTML=`MAPE <b>${fc.mape.toFixed(1)}%</b> · bias ${fc.bias>=0?'+':''}${fc.bias.toFixed(1)}% · next-6 avg ${fmt(Math.round(avg(fc.fc)))}/mo`;
+  $('dmAcc').innerHTML=`best method <b>${fc.method}</b> · MAPE <b>${fc.mape.toFixed(1)}%</b> · bias ${fc.bias>=0?'+':''}${fc.bias.toFixed(1)}% · next-6 avg ${fmt(Math.round(avg(fc.fc)))}/mo`;
+  $('dmAcc').title='In-sample MAPE (lowest wins) — '+fc.methods.map(m=>m.name+': '+m.mape.toFixed(1)+'%').join(' · ');
   ssCompute();
   const cap=Math.round(fc.mean*1.15),lab=[];for(let i=0;i<6;i++)lab.push('M'+(hist.length+1+i));
   mkChart('chSop',{type:'bar',data:{labels:lab,datasets:[{label:'Forecast demand',data:fc.fc,backgroundColor:'#3b82f6'},{type:'line',label:'Capacity',data:fc.fc.map(()=>cap),borderColor:'#f87171',borderDash:[5,4],pointRadius:0}]},options:{plugins:{legend:{position:'bottom'}}}});
