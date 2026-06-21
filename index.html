@@ -954,7 +954,7 @@ function initCTMap(){ctMap=L.map('ctmap',{worldCopyJump:true,minZoom:2}).setView
   ctLayer=L.layerGroup().addTo(ctMap);}
 function drawCTMap(list){if(!ctLayer)return;ctLayer.clearLayers();
   // B6a: cluster the shipment/location markers when the map is busy and the plugin loaded; otherwise add them straight to ctLayer (original behaviour). Arcs always stay as lines on ctLayer.
-  const useCluster=(typeof L.markerClusterGroup==='function')&&list.length>30;
+  const useCluster=(typeof L.markerClusterGroup==='function')&&list.length>12;
   const mk=useCluster?L.markerClusterGroup({chunkedLoading:true,maxClusterRadius:48,showCoverageOnHover:false,spiderfyOnMaxZoom:true}):ctLayer;
   list.forEach(s=>{const col=MODECOL[s.mode]||'#3b82f6';const risky=s.risk>=60||s.status==='Exception'||s.status==='Delayed'||s.status==='Customs Hold';
     L.polyline(arcPts(s.oc,s.dc),{color:col,weight:risky?2.6:1.6,opacity:risky?.95:.55,dashArray:s.status==='At Origin'?'4 6':null}).addTo(ctLayer).bindPopup(`<b>${s.id}</b> · ${s.mode}<br>${s.o} → ${s.d}<br>${s.carrier}<br>ETA ${s.eta} · risk ${s.risk}`);
