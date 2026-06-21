@@ -1,0 +1,37 @@
+name: CI
+
+# Runs the same harness gate as the autonomous enhancer:
+#   - node logic_test.js   (business-logic assertions; exits 1 on any failure)
+#   - python3 audit.py      (scores index.html; exits 1 if score < 90)
+# Either non-zero exit fails the job.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Audit & logic tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run logic tests
+        run: node logic_test.js
+
+      - name: Run audit
+        run: python3 audit.py
