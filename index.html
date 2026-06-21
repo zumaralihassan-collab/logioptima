@@ -19,6 +19,8 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- B1: MILP engine for integer/binary decision variables in the Optimization Studio (lazy/guarded use; graceful fallback to the built-in LP simplex if unavailable) -->
+<script src="https://cdn.jsdelivr.net/npm/javascript-lp-solver@0.4.24/prod/solver.js"></script>
 <style>
   :focus-visible{outline:2px solid #22d3ee;outline-offset:2px;border-radius:6px}
   :root{
@@ -380,7 +382,7 @@
       </div>
       <div id="optDesc" class="hint" style="margin:10px 0"></div>
       <h2 style="margin-top:6px">Decision variables</h2>
-      <div style="overflow:auto"><table><thead><tr><th>Variable</th><th>Description</th><th class="num">Obj. coeff.</th><th class="num">Lower</th><th class="num">Upper</th><th></th></tr></thead><tbody id="varBody"></tbody></table></div>
+      <div style="overflow:auto"><table><thead><tr><th>Variable</th><th>Description</th><th class="num">Obj. coeff.</th><th class="num">Lower</th><th class="num">Upper</th><th>Type</th><th></th></tr></thead><tbody id="varBody"></tbody></table></div>
       <button class="mini" id="addVar" style="margin-top:8px">+ Add variable</button>
       <h2 style="margin-top:16px">Constraints</h2>
       <div style="overflow:auto"><table><thead><tr><th>Name</th><th>Coefficients (per variable)</th><th>Sense</th><th class="num">RHS</th><th></th></tr></thead><tbody id="conBody"></tbody></table></div>
@@ -1294,6 +1296,10 @@ const OPT_TEMPLATES={
    desc:'Move 2,400 cbm via FTL / LTL / parcel at least cost, with FTL availability, a parcel cap and an urgent-parcel minimum.',
    vars:[{name:'FTL',desc:'cbm full truckload',obj:15,lo:0,hi:1800},{name:'LTL',desc:'cbm less-than-TL',obj:28,lo:0,hi:1e9},{name:'Parcel',desc:'cbm parcel',obj:45,lo:0,hi:200}],
    cons:[{name:'Move volume',c:[1,1,1],sense:'>=',rhs:2400},{name:'Urgent parcel min',c:[0,0,1],sense:'>=',rhs:80}]},
+ facility:{title:'Facility location — open the right DCs (MILP)',sense:'min',
+   desc:'A fixed-charge facility-location problem: decide which DCs to OPEN (binary, each carries a fixed cost) and how much to flow from each, meeting 1,000 units of demand at min total cost. Capacity only counts if the DC is open, and at most 2 may open. The LP relaxation opens fractions of a DC — only the integer/binary solver gives a real plan.',
+   vars:[{name:'Open_A',desc:'open DC A (fixed $500)',obj:500,lo:0,hi:1,type:'bin'},{name:'Open_B',desc:'open DC B (fixed $620)',obj:620,lo:0,hi:1,type:'bin'},{name:'Open_C',desc:'open DC C (fixed $450)',obj:450,lo:0,hi:1,type:'bin'},{name:'Flow_A',desc:'units shipped from A ($4/u)',obj:4,lo:0,hi:1e9},{name:'Flow_B',desc:'units shipped from B ($3/u)',obj:3,lo:0,hi:1e9},{name:'Flow_C',desc:'units shipped from C ($6/u)',obj:6,lo:0,hi:1e9}],
+   cons:[{name:'Meet demand',c:[0,0,0,1,1,1],sense:'>=',rhs:1000},{name:'Cap A (≤600·open)',c:[-600,0,0,1,0,0],sense:'<=',rhs:0},{name:'Cap B (≤700·open)',c:[0,-700,0,0,1,0],sense:'<=',rhs:0},{name:'Cap C (≤500·open)',c:[0,0,-500,0,0,1],sense:'<=',rhs:0},{name:'Open at most 2 DCs',c:[1,1,1,0,0,0],sense:'<=',rhs:2}]},
  blank:{title:'Blank model',sense:'max',desc:'Build your own: add variables and constraints.',
    vars:[{name:'x1',desc:'',obj:1,lo:0,hi:1e9},{name:'x2',desc:'',obj:1,lo:0,hi:1e9}],cons:[{name:'C1',c:[1,1],sense:'<=',rhs:10}]}
 };
@@ -1307,6 +1313,7 @@ function renderBuilder(){
     <td class="num"><input class="miniip" data-v="${i}" data-f="obj" type="number" value="${v.obj}"></td>
     <td class="num"><input class="miniip" data-v="${i}" data-f="lo" type="number" value="${v.lo}"></td>
     <td class="num"><input class="miniip" data-v="${i}" data-f="hi" type="number" value="${hiStr(v.hi)}" placeholder="∞"></td>
+    <td><select class="miniip" style="width:96px" data-v="${i}" data-f="type" title="Continuous = any value; Integer = whole units; Binary = 0/1 (open/close, yes/no)"><option value="cont"${(v.type||'cont')==='cont'?' selected':''}>Continuous</option><option value="int"${v.type==='int'?' selected':''}>Integer</option><option value="bin"${v.type==='bin'?' selected':''}>Binary 0/1</option></select></td>
     <td><span class="ibtn" data-delv="${i}">✕</span></td></tr>`).join('');
   $('conBody').innerHTML=OPT.cons.map((c,i)=>`<tr>
     <td><input class="miniip" style="width:110px" data-cn="${i}" value="${esc(c.name)}"></td>
@@ -1319,23 +1326,58 @@ function renderBuilder(){
 }
 const qv=s=>{const e=document.querySelector(s);return e?e.value:'';};
 function readBuilder(){OPT.sense=$('objSense').value;
-  OPT.vars.forEach((v,i)=>{v.name=qv(`[data-v="${i}"][data-f="name"]`)||v.name;v.desc=qv(`[data-v="${i}"][data-f="desc"]`);v.obj=+qv(`[data-v="${i}"][data-f="obj"]`)||0;v.lo=+qv(`[data-v="${i}"][data-f="lo"]`)||0;const h=qv(`[data-v="${i}"][data-f="hi"]`);v.hi=h===''?1e9:+h;});
+  OPT.vars.forEach((v,i)=>{v.name=qv(`[data-v="${i}"][data-f="name"]`)||v.name;v.desc=qv(`[data-v="${i}"][data-f="desc"]`);v.obj=+qv(`[data-v="${i}"][data-f="obj"]`)||0;v.lo=+qv(`[data-v="${i}"][data-f="lo"]`)||0;const h=qv(`[data-v="${i}"][data-f="hi"]`);v.hi=h===''?1e9:+h;const t=qv(`[data-v="${i}"][data-f="type"]`);v.type=t||v.type||'cont';});
   OPT.cons.forEach((c,i)=>{c.name=qv(`[data-cn="${i}"]`)||c.name;c.c=OPT.vars.map((_,j)=>+qv(`[data-cc="${i}"][data-cv="${j}"]`)||0);const s=qv(`[data-cs="${i}"]`);c.sense=s.includes('≤')||s==='≤'?'<=':s.includes('≥')||s==='≥'?'>=':s==='='?'=':(c.sense||'<=');c.rhs=+qv(`[data-cr="${i}"]`)||0;});}
+/* B1 — MILP bridge: translate the builder model to javascript-lp-solver (CDN) and solve with integer/binary
+   support. Returns {feasible,objective,values,bounded}. The global `solver` is referenced only here and is
+   guarded by the caller, so the Node logic harness — which never calls this — is unaffected. */
+function solveMILP(model,intVars,binVars){
+  let OBJ='__obj__';while(model.vars.some(v=>v.name===OBJ))OBJ+='_';
+  const sm={optimize:OBJ,opType:model.sense==='max'?'max':'min',constraints:{},variables:{},ints:{},binaries:{}};
+  const bset=new Set(binVars),iset=new Set(intVars);
+  model.vars.forEach(v=>{const o={};o[OBJ]=+v.obj||0;sm.variables[v.name]=o;});
+  model.cons.forEach((c,i)=>{const key='k'+i;model.vars.forEach(v=>{const a=+c.coef[v.name]||0;if(a)sm.variables[v.name][key]=a;});sm.constraints[key]=c.sense==='<='?{max:+c.rhs}:c.sense==='>='?{min:+c.rhs}:{equal:+c.rhs};});
+  model.vars.forEach((v,i)=>{if(bset.has(v.name)){sm.binaries[v.name]=1;return;}if(iset.has(v.name))sm.ints[v.name]=1;const lo=+v.lo||0,hi=(v.hi==null?1e9:+v.hi);if(lo>0){const k='lo'+i;sm.variables[v.name][k]=1;sm.constraints[k]={min:lo};}if(hi<1e8){const k='hi'+i;sm.variables[v.name][k]=1;sm.constraints[k]={max:hi};}});
+  let out;try{out=solver.Solve(sm);}catch(e){return{feasible:false};}
+  if(!out||!out.feasible)return{feasible:false};
+  const values={};model.vars.forEach(v=>values[v.name]=+(out[v.name]||0));
+  return{feasible:true,objective:+out.result,values,bounded:out.bounded!==false};
+}
 function solveOpt(){readBuilder();
   const model={sense:OPT.sense,vars:OPT.vars.map(v=>({name:v.name,obj:v.obj,lo:v.lo,hi:v.hi})),cons:OPT.cons.map(c=>({name:c.name,coef:Object.fromEntries(OPT.vars.map((v,j)=>[v.name,c.c[j]])),sense:c.sense,rhs:c.rhs}))};
-  const res=solveLP(model);OPTRES=res;
+  const lp=solveLP(model);
+  // Route through the MILP engine when any variable is integer/binary; otherwise the pure-LP path below is unchanged.
+  const intVars=OPT.vars.filter(v=>v.type==='int').map(v=>v.name),binVars=OPT.vars.filter(v=>v.type==='bin').map(v=>v.name);
+  let res=lp,milp=null;
+  if(intVars.length||binVars.length){
+    if(typeof solver!=='undefined'&&solver&&typeof solver.Solve==='function'){
+      const mip=solveMILP(model,intVars,binVars);
+      if(mip&&mip.feasible&&isFinite(mip.objective)){
+        milp={lpObj:lp.status==='optimal'?lp.objective:null,ints:intVars.length,bins:binVars.length};
+        const base=(lp.status==='optimal'?lp.vars:model.vars.map(v=>({name:v.name})));
+        res={status:'optimal',objective:mip.objective,values:mip.values,constraints:(lp.constraints||[]),
+             vars:base.map(v=>Object.assign({rc:0,objInc:Infinity,objDec:Infinity},v,{value:mip.values[v.name]||0}))};
+      } else if(mip&&!mip.feasible){res={status:'infeasible'};}
+    } else {milp={noSolver:true};}
+  }
+  OPTRES=res;
   if(res.status!=='optimal'){$('optResult').innerHTML=`<div class="kpi rr"><div class="k">No optimal solution</div><div class="v" style="font-size:16px">${res.status.toUpperCase()}</div><div class="sub2">${res.status==='infeasible'?'Constraints conflict — relax a bound or RHS.':'Objective is unbounded — add a limiting constraint.'}</div></div>`;$('optSens').innerHTML='';if(CHARTS.chOpt)CHARTS.chOpt.destroy();return;}
+  const sens=(lp&&lp.status==='optimal')?lp:res;
+  const isMilp=!!(milp&&!milp.noSolver);
+  const milpTag=isMilp?` <span class="tag">MILP · integer-optimal</span>`:'';
   const used=res.vars.filter(v=>v.value>1e-6);
-  $('optResult').innerHTML=`<div class="kpi rg"><div class="k">Optimal objective (${OPT.sense})</div><div class="v">${f$(res.objective).replace('$',OPT.sense==='max'?'$':'$')}</div></div>
+  $('optResult').innerHTML=`<div class="kpi rg"><div class="k">Optimal objective (${OPT.sense})${milpTag}</div><div class="v">${f$(res.objective).replace('$',OPT.sense==='max'?'$':'$')}</div></div>
     <table style="margin-top:10px"><thead><tr><th>Variable</th><th>Description</th><th class="num">Value</th></tr></thead><tbody>${res.vars.map(v=>{const d=(OPT.vars.find(x=>x.name===v.name)||{}).desc||'';return `<tr><td><b>${esc(v.name)}</b></td><td class="hint">${esc(d)}</td><td class="num ${v.value>1e-6?'best':''}">${f1(v.value)}</td></tr>`;}).join('')}</tbody></table>
-    <div class="hint" style="margin-top:8px">Recommendation: ${used.length?used.map(v=>`<b>${esc(v.name)} = ${f1(v.value)}</b>`).join(', '):'do nothing'}.</div>`;
+    <div class="hint" style="margin-top:8px">Recommendation: ${used.length?used.map(v=>`<b>${esc(v.name)} = ${f1(v.value)}</b>`).join(', '):'do nothing'}.</div>${isMilp&&milp.lpObj!=null?`<div class="hint" style="margin-top:6px">Integer/binary optimum <b>${f$(res.objective)}</b> vs LP relaxation <b>${f$(milp.lpObj)}</b> — integrality gap <b>${f$(Math.abs(res.objective-milp.lpObj))}</b>${milp.lpObj!==0?` (${pct(Math.abs(res.objective-milp.lpObj)/Math.abs(milp.lpObj)*100)})`:''}, solved with ${milp.bins?milp.bins+' binary':''}${milp.bins&&milp.ints?' + ':''}${milp.ints?milp.ints+' integer':''} variable(s).</div>`:''}${milp&&milp.noSolver?`<div class="hint" style="margin-top:6px;color:var(--bad,#f87171)">Integer/binary variables detected, but the MILP solver library isn't loaded — showing the continuous (LP) solution as a fallback.</div>`:''}`;
   mkChart('chOpt',{type:'bar',data:{labels:res.vars.map(v=>v.name),datasets:[{label:'Optimal value',data:res.vars.map(v=>Math.round(v.value*100)/100),backgroundColor:res.vars.map((_,i)=>CC[i%CC.length])}]},options:{plugins:{legend:{display:false}}}});
-  renderSens(res);$('optAI').innerHTML='';
+  renderSens(sens,isMilp);$('optAI').innerHTML='';
 }
-function renderSens(res){
+function renderSens(res,relax){
+  if(!res||!res.vars){$('optSens').innerHTML='';return;}
+  const note=relax?`<div class="hint" style="margin:0 0 8px">Sensitivity ranging below is computed on the <b>LP relaxation</b> of this model — integer &amp; binary programs have no exact shadow prices or reduced costs, so treat these as directional guidance for the continuous problem.</div>`:'';
   const vt=`<h2 style="margin:4px 0 8px">Decision variables</h2><div style="overflow:auto"><table><thead><tr><th>Variable</th><th class="num">Final value</th><th class="num">Reduced cost</th><th class="num">Obj coeff</th><th class="num">Allow. ↑</th><th class="num">Allow. ↓</th></tr></thead><tbody>${res.vars.map(v=>{const oc=(OPT.vars.find(x=>x.name===v.name)||{}).obj;return `<tr><td><b>${esc(v.name)}</b></td><td class="num">${f1(v.value)}</td><td class="num">${f1(v.rc)}</td><td class="num">${oc}</td><td class="num">${rng(v.objInc)}</td><td class="num">${rng(v.objDec)}</td></tr>`;}).join('')}</tbody></table></div>`;
   const ct=`<h2 style="margin:14px 0 8px">Constraints <span class="sub">shadow price = Δobjective per unit of RHS</span></h2><div style="overflow:auto"><table><thead><tr><th>Constraint</th><th class="num">Final LHS</th><th class="num">RHS</th><th>Status</th><th class="num">Shadow price</th><th class="num">Allow. ↑</th><th class="num">Allow. ↓</th></tr></thead><tbody>${res.constraints.map(c=>`<tr><td>${esc(c.name)}${c.bound?' <span class="tag">bound</span>':''}</td><td class="num">${f1(c.lhs)}</td><td class="num">${f1(c.rhs)}</td><td>${c.binding?'<span class="pill rag-a">binding</span>':'<span class="pill rag-g">slack '+f1(c.slack)+'</span>'}</td><td class="num ${Math.abs(c.shadow)>1e-6?'best':''}">${f1(c.shadow)}</td><td class="num">${rng(c.rhsInc)}</td><td class="num">${rng(c.rhsDec)}</td></tr>`).join('')}</tbody></table></div>`;
-  $('optSens').innerHTML=vt+ct;
+  $('optSens').innerHTML=note+vt+ct;
 }
 function interpretSolution(){if(!OPTRES||OPTRES.status!=='optimal'){$('optAI').innerHTML='<div class="hint">Solve a feasible model first.</div>';return;}
   const r=OPTRES;const used=r.vars.filter(v=>v.value>1e-6);
@@ -1352,16 +1394,17 @@ function interpretSolution(){if(!OPTRES||OPTRES.status!=='optimal'){$('optAI').i
   if(localStorage.getItem('lo_key'))ask('Interpret this optimization result and recommend next actions: '+JSON.stringify({sense:OPT.sense,objective:Math.round(r.objective),plan:used.map(v=>v.name+'='+Math.round(v.value)),binding:binds.map(c=>c.name+' (shadow '+f1(c.shadow)+')')}));
 }
 function exportOptXlsx(){if(!OPTRES||OPTRES.status!=='optimal'){toast('Solve a feasible model first.');return;}readBuilder();const r=OPTRES;
-  const model=[['Objective sense',OPT.sense],[],['Variable','Description','Obj coeff','Lower','Upper'],...OPT.vars.map(v=>[v.name,v.desc,v.obj,v.lo,v.hi>=1e8?'inf':v.hi]),[],['Constraint',...OPT.vars.map(v=>v.name),'Sense','RHS'],...OPT.cons.map(c=>[c.name,...c.c,c.sense,c.rhs])];
+  const _ty={cont:'Continuous',int:'Integer',bin:'Binary'};
+  const model=[['Objective sense',OPT.sense],[],['Variable','Description','Obj coeff','Lower','Upper','Type'],...OPT.vars.map(v=>[v.name,v.desc,v.obj,v.lo,v.hi>=1e8?'inf':v.hi,_ty[v.type||'cont']]),[],['Constraint',...OPT.vars.map(v=>v.name),'Sense','RHS'],...OPT.cons.map(c=>[c.name,...c.c,c.sense,c.rhs])];
   const answer=[['ANSWER REPORT — Zumar\'s Logic-tics Stop'],['Objective ('+OPT.sense+')',Math.round(r.objective*1000)/1000],[],['Variable cells'],['Name','Final value'],...r.vars.map(v=>[v.name,Math.round(v.value*1000)/1000]),[],['Constraints'],['Name','Final LHS','RHS','Status','Slack'],...r.constraints.map(c=>[c.name,Math.round(c.lhs*1000)/1000,c.rhs,c.binding?'Binding':'Not binding',Math.round(c.slack*1000)/1000])];
   const sens=[['SENSITIVITY REPORT — Zumar\'s Logic-tics Stop'],[],['Variable cells'],['Name','Final value','Reduced cost','Objective coeff','Allowable increase','Allowable decrease'],...r.vars.map(v=>{const oc=(OPT.vars.find(x=>x.name===v.name)||{}).obj;return [v.name,Math.round(v.value*1000)/1000,Math.round(v.rc*1000)/1000,oc,v.objInc>1e6?'1E+30':Math.round(v.objInc*1000)/1000,v.objDec>1e6?'1E+30':Math.round(v.objDec*1000)/1000];}),[],['Constraints'],['Name','Final value','Shadow price','RHS','Allowable increase','Allowable decrease'],...r.constraints.map(c=>[c.name,Math.round(c.lhs*1000)/1000,Math.round(c.shadow*1000)/1000,c.rhs,c.rhsInc>1e6?'1E+30':Math.round(c.rhsInc*1000)/1000,c.rhsDec>1e6?'1E+30':Math.round(c.rhsDec*1000)/1000])];
   exportXlsx('optimization_report.xlsx',[{name:'Model',rows:model},{name:'Answer Report',rows:answer},{name:'Sensitivity Report',rows:sens}]);
   toast('Exported model + Answer + Sensitivity to Excel.');}
 function wireOpt(){
-  $('optTemplate').innerHTML=Object.entries({modemix:'Mode & load optimization',transport:'Transportation / network flow',margin:'Contract / freight mix (max margin)',consol:'Consolidation & cube utilization',blank:'Blank model'}).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  $('optTemplate').innerHTML=Object.entries({modemix:'Mode & load optimization',transport:'Transportation / network flow',margin:'Contract / freight mix (max margin)',consol:'Consolidation & cube utilization',facility:'Facility location (binary open/close · MILP)',blank:'Blank model'}).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   $('optTemplate').onchange=e=>loadTemplate(e.target.value);
   $('optSolve').onclick=solveOpt;$('objSense').onchange=()=>{readBuilder();};
-  $('addVar').onclick=()=>{readBuilder();OPT.vars.push({name:'x'+(OPT.vars.length+1),desc:'',obj:1,lo:0,hi:1e9});OPT.cons.forEach(c=>c.c.push(0));renderBuilder();};
+  $('addVar').onclick=()=>{readBuilder();OPT.vars.push({name:'x'+(OPT.vars.length+1),desc:'',obj:1,lo:0,hi:1e9,type:'cont'});OPT.cons.forEach(c=>c.c.push(0));renderBuilder();};
   $('addCon').onclick=()=>{readBuilder();OPT.cons.push({name:'C'+(OPT.cons.length+1),c:OPT.vars.map(()=>0),sense:'<=',rhs:0});renderBuilder();};
   $('optExport').onclick=exportOptXlsx;$('optInterpret').onclick=interpretSolution;
   document.querySelectorAll('#optSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#optSeg button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('opt-solver').style.display=b.dataset.sub==='solver'?'block':'none';$('opt-routing').style.display=b.dataset.sub==='routing'?'block':'none';});

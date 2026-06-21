@@ -88,6 +88,7 @@ def audit(fp):
         "Executive one-pager": "execpanel" in low and "renderexec" in low,
         "Sustainability SBT glide path": "chsbt" in low,
         "Copilot function-calling (E1)": "copilotaction" in low and "parseintent" in low,
+        "Optimization MILP (integer/binary)": "solvemilp" in low and "javascript-lp-solver" in low,
     }
     for name, present in feat.items():
         add("feat:" + name, "Features", 3, present, name, "Implement '" + name + "'")

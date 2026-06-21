@@ -120,6 +120,11 @@ const TESTS = `
     ok(_si && _si.kind==='sim' && _si.key==='hormuz', 'parseIntent maps "run hormuz simulation" -> hormuz scenario');
     ok(parseIntent('which lanes bled money last quarter and why?')===null, 'parseIntent ignores non-action queries');
   }
+  // 11) optional: MILP bridge (B1) -- graceful fallback when the solver lib is absent (no solver global in this harness)
+  if (typeof solveMILP==='function'){
+    var _mp=solveMILP({sense:'min',vars:[{name:'a',obj:1,lo:0,hi:5}],cons:[{name:'c',coef:{a:1},sense:'>=',rhs:2}]},['a'],[]);
+    ok(_mp && _mp.feasible===false, 'solveMILP degrades gracefully (feasible:false) when the solver library is unavailable');
+  }
   console.log('\\nLOGIC: '+passes+' passed, '+failures+' failed.');
   if(failures>0) process.exitCode=1;
 })();
