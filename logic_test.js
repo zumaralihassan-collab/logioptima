@@ -105,6 +105,13 @@ const TESTS = `
     var enc=encodePlan(); var dec=decodePlan(enc);
     ok(dec && Array.isArray(dec.locations) && dec.locations.length===locations.length, 'encode/decode plan round-trips locations');
   }
+  // 9) business-logic engines (D1): cost / carrier / disruption
+  if (typeof genShipments==='function'){ genShipments();
+    ok(typeof SHIPMENTS!=='undefined' && SHIPMENTS.length>0, 'genShipments populates SHIPMENTS ('+SHIPMENTS.length+')');
+    if (typeof shouldCost==='function'){ var _sc=shouldCost({dist:10000,mode:'Ocean',weightKg:10000,fuel:18,acc:300,dray:600}); ok(_sc>0 && isFinite(_sc), 'shouldCost returns a positive cost ('+Math.round(_sc)+')'); }
+    if (typeof carrierStats==='function'){ var _cs=carrierStats(); ok(Array.isArray(_cs)&&_cs.length>0, 'carrierStats returns rows ('+_cs.length+')'); ok(_cs.every(function(c){return c.otd>=0&&c.otd<=100;}), 'carrierStats OTD within 0-100%'); }
+  }
+  if (typeof DISRUPTIONS==='object' && DISRUPTIONS.hormuz){ ok(DISRUPTIONS.hormuz.addDays>0 && DISRUPTIONS.hormuz.mult>1, 'DISRUPTIONS.hormuz adds delay and cost'); }
   console.log('\\nLOGIC: '+passes+' passed, '+failures+' failed.');
   if(failures>0) process.exitCode=1;
 })();

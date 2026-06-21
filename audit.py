@@ -82,6 +82,10 @@ def audit(fp):
         "Risk & resilience module": "view-risk" in low and "rundisruption" in low,
         "Demand & S&OP forecasting": "view-demand" in low and "function forecast" in low,
         "Fulfillment Ops (FC network)": "view-fc" in low and "renderfc" in low,
+        "Procurement & Freight RFP": "view-procure" in low and "renderprocure" in low,
+        "Supplier Management": "view-supplier" in low and "rendersupplier" in low,
+        "Executive one-pager": "execpanel" in low and "renderexec" in low,
+        "Sustainability SBT glide path": "chsbt" in low,
     }
     for name, present in feat.items():
         add("feat:" + name, "Features", 3, present, name, "Implement '" + name + "'")

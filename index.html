@@ -206,6 +206,8 @@
     <button data-view="risk">🛡️ Risk &amp; Resilience</button>
     <button data-view="demand">📈 Demand &amp; S&amp;OP</button>
     <button data-view="fc">🏭 Fulfillment Ops</button>
+    <button data-view="procure">🧾 Procurement</button>
+    <button data-view="supplier">🤝 Suppliers</button>
   </nav>
   <div class="badge">AI-Assisted · Live</div>
   <button class="iconbtn" id="themeBtn" aria-label="Switch to light theme" title="Toggle light / dark theme" onclick="toggleTheme()">◐</button>
@@ -216,6 +218,9 @@
 
 <!-- ===================== CONTROL TOWER (HERO) ===================== -->
 <div class="view active" id="view-control">
+  <div class="card" style="margin-bottom:16px"><h2>Executive summary <span class="sub">one-pager — board view (use 🖨 PDF to export)</span></h2>
+    <div id="execPanel" style="display:flex;flex-wrap:wrap;gap:14px"></div>
+    <div id="execNarr" class="hint" style="margin-top:10px;font-size:12.5px;color:var(--txt)"></div></div>
   <div class="grid4" id="ctKpis" aria-live="polite"></div>
   <div class="grid2" style="grid-template-columns:1fr 340px">
     <div class="card">
@@ -609,6 +614,10 @@
     <div class="card"><h2>Emissions intensity by commodity</h2><div id="susCom"></div></div>
     <div class="card"><h2>CO₂ vs cost frontier <span class="sub">per mode</span></h2><div class="chartbox"><canvas id="chSusFrontier"></canvas></div></div>
   </div>
+  <div class="grid2">
+    <div class="card"><h2>Science-based-target glide path <span class="sub">trajectory to −42% by 2030</span></h2><div class="chartbox"><canvas id="chSBT"></canvas></div></div>
+    <div class="card"><h2>CO₂ by customer</h2><div id="susCust"></div></div>
+  </div>
 </div>
 <!-- ===================== RISK & RESILIENCE ===================== -->
 <div class="view" id="view-risk">
@@ -648,6 +657,27 @@
   </div>
   <div class="card"><h2>FC scorecard</h2><table><thead><tr><th scope="col">Facility</th><th scope="col">Region</th><th scope="col" class="num">Throughput/day</th><th scope="col" class="num">Capacity</th><th scope="col" class="num">Utilization</th><th scope="col" class="num">Associates</th><th scope="col" class="num">On-time ship</th><th scope="col" class="num">$/unit</th></tr></thead><tbody id="fcBody"></tbody></table></div>
   <div class="card"><h2>ABC slotting <span class="sub">Pareto — fast movers near the dock</span></h2><div class="chartbox"><canvas id="chAbc"></canvas></div></div>
+</div>
+<!-- ===================== PROCUREMENT & FREIGHT RFP ===================== -->
+<div class="view" id="view-procure">
+  <div class="card"><h2>Procurement &amp; freight RFP <span class="sub">benchmark rates, compare carrier bids, optimize allocation</span></h2>
+    <div class="kgrid" id="pcKpis"></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Carrier bid comparison <span class="sub">$ / mile</span></h2><div class="chartbox"><canvas id="chPcCarrier"></canvas></div></div>
+    <div class="card"><h2>Contract vs spot mix <span class="sub">of freight spend</span></h2><div class="chartbox"><canvas id="chPcMix"></canvas></div></div>
+  </div>
+  <div class="card"><h2>Lane-rate benchmark <span class="sub">should-cost vs invoiced</span></h2><div id="pcLanes"></div></div>
+  <div class="card"><h2>Allocation recommendation</h2><div id="pcRecs"></div></div>
+</div>
+<!-- ===================== SUPPLIER MANAGEMENT ===================== -->
+<div class="view" id="view-supplier">
+  <div class="card"><h2>Supplier management <span class="sub">reliability, lead-time variability &amp; sourcing risk</span></h2>
+    <div class="kgrid" id="spKpis"></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Lead-time variability by supplier</h2><div class="chartbox"><canvas id="chSpVar"></canvas></div></div>
+    <div class="card"><h2>Dual-source coverage <span class="sub">single points of failure</span></h2><div id="spDual"></div></div>
+  </div>
+  <div class="card"><h2>Supplier scorecard</h2><table><thead><tr><th scope="col">Supplier</th><th scope="col">Commodity</th><th scope="col">Mode</th><th scope="col" class="num">Avg LT (d)</th><th scope="col" class="num">Target</th><th scope="col" class="num">On-time</th><th scope="col" class="num">Variability</th><th scope="col">Grade</th></tr></thead><tbody id="spBody"></tbody></table></div>
 </div>
 </div><!-- /main -->
 
@@ -1046,7 +1076,7 @@ function openShipment(id){const s=SHIPMENTS.find(x=>x.id===id);if(!s)return;cons
   $('ctAsk').onclick=()=>{$('ctModal').classList.remove('show');ask(`Explain shipment ${s.id} (${s.o}→${s.d}, ${s.mode}, ${s.carrier}), its ${s.risk} risk score and what I should do.`);};
   $('ctModal').classList.add('show');}
 
-function renderControl(){ctKpiCards();renderInbox();renderCTTable();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));}
+function renderControl(){renderExec();ctKpiCards();renderInbox();renderCTTable();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));}
 
 /* control tower wiring */
 function ctExportRows(){return SHIPMENTS.map(s=>({ID:s.id,Origin:s.o,Destination:s.d,Mode:s.mode,Carrier:s.carrier,Commodity:s.commodity,HS:s.hs,Customer:s.customer,Incoterm:s.incoterm,ETD:s.etd,ETA:s.eta,PredictedETA:s.predEta,Status:s.status,RiskScore:s.risk,DistanceKm:s.dist,WeightKg:s.weightKg,Value:s.value,ShouldCost:s.should,Invoiced:s.invoiced,DnD_Cost:s.dndCost,CO2_kg:s.co2,Exception:s.exc||''}));}
@@ -1568,6 +1598,17 @@ function renderSustain(){
   $('susCom').innerHTML=`<table><thead><tr><th>Commodity</th><th class="num">g/ton-km</th><th class="num">Total t</th></tr></thead><tbody>${ci.map(x=>`<tr><td>${x.n}</td><td class="num">${Math.round(x.inten)}</td><td class="num">${fmt(Math.round(x.co2/1000))}</td></tr>`).join('')}</tbody></table>`;
   const fr=Object.keys(byMode).map(m=>{const sh=SHIPMENTS.filter(s=>s.mode===m);return {x:Math.round(sh.reduce((a,s)=>a+s.invoiced,0)/1000),y:Math.round(byMode[m]/1000),m};});
   mkChart('chSusFrontier',{type:'scatter',data:{datasets:fr.map(p=>({label:p.m,data:[{x:p.x,y:p.y}],backgroundColor:MODECOL[p.m],pointRadius:9}))},options:{scales:{x:{title:{display:true,text:'$000 spend'}},y:{title:{display:true,text:'t CO₂'}}},plugins:{legend:{position:'bottom'}}}});
+  // SBT glide path (B3)
+  var _base=total*1.08, _yrs=[2024,2025,2026,2027,2028,2029,2030];
+  var _tgt=_yrs.map(function(y,i){return Math.round(_base*(1-0.42*(i/(_yrs.length-1)))/1000);});
+  var _act=_yrs.map(function(y,i){return i<=2?Math.round(_base*(1-0.055*i)/1000):null;});
+  mkChart('chSBT',{type:'line',data:{labels:_yrs,datasets:[
+    {label:'Target (-42% by 2030)',data:_tgt,borderColor:'#34d399',borderDash:[5,4],tension:.2,pointRadius:2},
+    {label:'Actual / projected',data:_act,borderColor:'#22d3ee',tension:.2}]},
+    options:{plugins:{legend:{position:'bottom'}},scales:{y:{title:{display:true,text:'t CO2'}}}}});
+  var _bc={};SHIPMENTS.forEach(function(s){_bc[s.customer]=(_bc[s.customer]||0)+s.co2;});
+  var _cu=Object.entries(_bc).sort(function(a,b){return b[1]-a[1];});
+  if($('susCust'))$('susCust').innerHTML='<table><thead><tr><th>Customer</th><th class="num">t CO2</th><th class="num">Share</th></tr></thead><tbody>'+_cu.map(function(e){return '<tr><td>'+esc(e[0])+'</td><td class="num">'+fmt(Math.round(e[1]/1000))+'</td><td class="num">'+pct(e[1]/total*100)+'</td></tr>';}).join('')+'</tbody></table>';
 }
 // --- Risk & Resilience ---
 const RASIA=['Shanghai','Shenzhen','Ningbo','Busan','Guangzhou','Hong Kong','Singapore','Tokyo','Seoul','Mumbai','Chennai'];
@@ -1639,7 +1680,45 @@ function wireExtra(){
   $('riskRun').onclick=runDisruption;
   $('fcVolL').textContent=(240000).toLocaleString();
 }
-const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData,sustain:renderSustain,risk:renderRisk,demand:renderDemand,fc:renderFC};
+/* ========================================================================
+   MORE MODULES: Procurement RFP (A1) · Supplier Mgmt (A5) · Executive one-pager (C1)
+   ======================================================================== */
+function renderProcure(){
+  const lanes=laneAgg();
+  const spend=SHIPMENTS.reduce((a,s)=>a+s.invoiced,0), should=SHIPMENTS.reduce((a,s)=>a+s.should,0);
+  const overpay=lanes.reduce((a,l)=>a+Math.max(0,l.va),0);
+  kpiGrid('pcKpis',[['Freight spend',f$(spend),''],['Addressable overpay',f$(overpay),''],['Avg rate variance',pct((spend-should)/should*100),''],['Carriers',CARRIERS.length,'in RFP']]);
+  $('pcLanes').innerHTML=`<table><thead><tr><th>Lane</th><th>Mode</th><th class="num">Should-cost</th><th class="num">Invoiced</th><th class="num">Variance</th><th>Flag</th></tr></thead><tbody>${lanes.slice(0,12).map(l=>`<tr><td>${l.lane}</td><td><span class="modetag" style="background:${MODECOL[l.mode]}">${l.mode}</span></td><td class="num">${f$(l.should)}</td><td class="num">${f$(l.inv)}</td><td class="num" style="color:${l.va>0?'var(--bad)':'var(--good)'}">${l.va>0?'+':''}${f$(l.va)}</td><td>${l.pc>8?'<span class="pill rag-r">overpriced</span>':l.pc>0?'<span class="pill rag-a">watch</span>':'<span class="pill rag-g">fair</span>'}</td></tr>`).join('')}</tbody></table>`;
+  mkChart('chPcCarrier',{type:'bar',data:{labels:CARRIERS.map(c=>c.name),datasets:[{label:'$/mile',data:CARRIERS.map(c=>c.cpm),backgroundColor:CARRIERS.map(c=>MODECOL[c.mode])}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'$ / mile'}}}}});
+  const contract=Math.round(spend*0.68), spot=spend-contract, spotPrem=Math.round(spot*0.12);
+  mkChart('chPcMix',{type:'doughnut',data:{labels:['Contract','Spot'],datasets:[{data:[contract,spot],backgroundColor:['#34d399','#fbbf24']}]},options:{plugins:{legend:{position:'right'},tooltip:{callbacks:{label:c=>c.label+': '+f$(c.raw)}}}}});
+  const byMode={};CARRIERS.forEach(c=>{(byMode[c.mode]=byMode[c.mode]||[]).push(c);});
+  const recs=Object.keys(byMode).map(m=>{const sorted=byMode[m].slice().sort((a,b)=>(b.rel/b.cpm)-(a.rel/a.cpm));const best=sorted[0],worst=sorted[sorted.length-1];return {m,best:best.name,worst:worst.name,gap:Math.round((worst.cpm-best.cpm)/worst.cpm*100)};});
+  $('pcRecs').innerHTML=`<table><thead><tr><th>Mode</th><th>Best value (reliability ÷ $/mi)</th><th>Reallocate from</th><th class="num">Rate gap</th></tr></thead><tbody>${recs.map(r=>`<tr><td><span class="modetag" style="background:${MODECOL[r.m]}">${r.m}</span></td><td><b>${r.best}</b></td><td>${r.worst}</td><td class="num">${r.gap}%</td></tr>`).join('')}</tbody></table><div class="src">Contract vs spot: moving the ${f$(spot)} spot spend onto contract rates saves ~${f$(spotPrem)} in spot premium. Addressable lane overpay totals ${f$(overpay)}.</div>`;
+}
+function renderSupplier(){
+  const src=(typeof LEADTIME!=='undefined')?LEADTIME:[];
+  const bySup={};src.forEach(r=>{const a=bySup[r.supplier]=bySup[r.supplier]||{supplier:r.supplier,lane:r.lane,commodity:r.commodity,mode:r.mode,lts:[],target:r.target};a.lts.push(r.lt);});
+  const sup=Object.values(bySup).map(a=>{const mean=avg(a.lts),sd=Math.sqrt(avg(a.lts.map(x=>(x-mean)*(x-mean)))),otd=avg(a.lts.map(x=>x<=a.target?100:0)),cv=mean?sd/mean*100:0;const grade=otd>=95?'A':otd>=88?'B':otd>=80?'C':'D';return Object.assign(a,{mean,sd,otd,cv,grade});}).sort((x,y)=>y.otd-x.otd);
+  const byCom={};sup.forEach(s=>{(byCom[s.commodity]=byCom[s.commodity]||[]).push(s.supplier);});
+  const single=Object.entries(byCom).filter(e=>e[1].length===1);
+  kpiGrid('spKpis',[['Suppliers',sup.length,''],['Avg lead time',sup.length?avg(sup.map(s=>s.mean)).toFixed(1):'0','d'],['On-time',sup.length?pct(avg(sup.map(s=>s.otd))):'0%',''],['Single-source',single.length,'commodities']]);
+  mkChart('chSpVar',{type:'bar',data:{labels:sup.map(s=>s.supplier),datasets:[{label:'Lead-time CV %',data:sup.map(s=>Math.round(s.cv)),backgroundColor:sup.map(s=>s.cv>25?'#f87171':s.cv>15?'#fbbf24':'#34d399')}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'coefficient of variation %'}}}}});
+  $('spBody').innerHTML=sup.map(s=>`<tr><td><b>${esc(s.supplier)}</b></td><td>${s.commodity}</td><td><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span></td><td class="num">${s.mean.toFixed(1)}</td><td class="num">${s.target}</td><td class="num">${pct(s.otd)}</td><td class="num">${Math.round(s.cv)}%</td><td><span class="grade ${gradeCol(s.grade)}">${s.grade}</span></td></tr>`).join('');
+  $('spDual').innerHTML=single.length?`<table><thead><tr><th>Single-source commodity</th><th>Sole supplier</th><th>Risk</th></tr></thead><tbody>${single.map(e=>`<tr><td><b>${e[0]}</b></td><td>${e[1][0]}</td><td><span class="pill rag-r">single point</span></td></tr>`).join('')}</tbody></table>`:'<div class="hint">No single-source commodities — healthy dual-source coverage.</div>';
+}
+function renderExec(){
+  if(!$('execPanel'))return;
+  const dv=delivered(), act=active();
+  const otif=avg(dv.map(s=>(s.onTime&&s.inFull)?100:0)), otd=avg(dv.map(s=>s.onTime?100:0));
+  const spend=SHIPMENTS.reduce((a,s)=>a+s.invoiced,0), dnd=SHIPMENTS.reduce((a,s)=>a+s.dndCost,0);
+  const exc=act.filter(s=>s.exc), atRisk=act.filter(s=>s.risk>=60).length, lanes=laneAgg(), leak=lanes[0];
+  const top=exc.slice().sort((a,b)=>b.risk-a.risk).slice(0,3);
+  const cells=[['OTIF',pct(otif)],['On-time',pct(otd)],['Open exceptions',exc.length],['At-risk (≥60)',atRisk],['Freight spend',f$(spend)],['D&D leakage',f$(dnd)]];
+  $('execPanel').innerHTML=cells.map(c=>`<div style="flex:1;min-width:120px;border-left:3px solid var(--accent);padding:2px 0 2px 10px"><div style="font-size:11px;color:var(--muted)">${c[0]}</div><div style="font-size:20px;font-weight:800">${c[1]}</div></div>`).join('');
+  $('execNarr').innerHTML=`<b>Biggest cost leak:</b> ${leak?esc(leak.lane)+' ('+leak.mode+') overpaying '+f$(leak.va):'none'}. &nbsp;<b>Top exceptions:</b> ${top.length?top.map(s=>esc(s.id)+' · '+esc(s.exc||'')).join(' &nbsp;|&nbsp; '):'none — network clean'}.`;
+}
+const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData,sustain:renderSustain,risk:renderRisk,demand:renderDemand,fc:renderFC,procure:renderProcure,supplier:renderSupplier};
 function showView(name){CURVIEW=name;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+name).classList.add('active');
   if(RENDER[name])RENDER[name]();
   if(name==='control'&&ctMap)setTimeout(()=>{ctMap.invalidateSize();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));},60);
