@@ -14,6 +14,9 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b82f6'/%3E%3Ctext x='16' y='23' font-size='20' font-family='Arial' font-weight='bold' text-anchor='middle' fill='%2306121f'%3EZ%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -950,12 +953,16 @@ function initCTMap(){ctMap=L.map('ctmap',{worldCopyJump:true,minZoom:2}).setView
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:12}).addTo(ctMap);
   ctLayer=L.layerGroup().addTo(ctMap);}
 function drawCTMap(list){if(!ctLayer)return;ctLayer.clearLayers();
+  // B6a: cluster the shipment/location markers when the map is busy and the plugin loaded; otherwise add them straight to ctLayer (original behaviour). Arcs always stay as lines on ctLayer.
+  const useCluster=(typeof L.markerClusterGroup==='function')&&list.length>30;
+  const mk=useCluster?L.markerClusterGroup({chunkedLoading:true,maxClusterRadius:48,showCoverageOnHover:false,spiderfyOnMaxZoom:true}):ctLayer;
   list.forEach(s=>{const col=MODECOL[s.mode]||'#3b82f6';const risky=s.risk>=60||s.status==='Exception'||s.status==='Delayed'||s.status==='Customs Hold';
     L.polyline(arcPts(s.oc,s.dc),{color:col,weight:risky?2.6:1.6,opacity:risky?.95:.55,dashArray:s.status==='At Origin'?'4 6':null}).addTo(ctLayer).bindPopup(`<b>${s.id}</b> · ${s.mode}<br>${s.o} → ${s.d}<br>${s.carrier}<br>ETA ${s.eta} · risk ${s.risk}`);
     if(risky){const f=Math.max(.05,Math.min(.95,(TODAY-parseD(s.etd))/((s.planned||1)*864e5)));const p=arcPts(s.oc,s.dc,40);const pos=p[Math.round(f*(p.length-1))]||p[0];
-      L.circleMarker(pos,{radius:5,color:'#08111c',weight:1.5,fillColor:'#f87171',fillOpacity:.95}).addTo(ctLayer).bindPopup(`<b>⚠ ${s.id}</b><br>${esc(s.exc||'At risk')}<br>${s.o} → ${s.d}`);}});
+      L.circleMarker(pos,{radius:5,color:'#08111c',weight:1.5,fillColor:'#f87171',fillOpacity:.95}).addTo(mk).bindPopup(`<b>⚠ ${s.id}</b><br>${esc(s.exc||'At risk')}<br>${s.o} → ${s.d}`);}});
   // origin/dest dots
-  const seen={};list.forEach(s=>{[['o','oc','#f59e0b'],['d','dc','#34d399']].forEach(([nk,ck,col])=>{const key=s[nk];if(seen[key])return;seen[key]=1;const c=s[ck];L.circleMarker([c.lat,c.lon],{radius:3,color:col,weight:1,fillColor:col,fillOpacity:.8}).addTo(ctLayer);});});}
+  const seen={};list.forEach(s=>{[['o','oc','#f59e0b'],['d','dc','#34d399']].forEach(([nk,ck,col])=>{const key=s[nk];if(seen[key])return;seen[key]=1;const c=s[ck];L.circleMarker([c.lat,c.lon],{radius:3,color:col,weight:1,fillColor:col,fillOpacity:.8}).addTo(mk);});});
+  if(useCluster)ctLayer.addLayer(mk);}
 
 function ctKpiCards(){const ws=weeklySeries();const dv=delivered();
   const otif=dv.length?avg(dv.map(s=>(s.onTime&&s.inFull)?100:0)):0;
