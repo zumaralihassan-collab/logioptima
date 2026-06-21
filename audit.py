@@ -84,6 +84,7 @@ def audit(fp):
         "Fulfillment Ops (FC network)": "view-fc" in low and "renderfc" in low,
         "Procurement & Freight RFP": "view-procure" in low and "renderprocure" in low,
         "Supplier Management": "view-supplier" in low and "rendersupplier" in low,
+        "Returns & Reverse Logistics": "view-returns" in low and "renderreturns" in low,
         "Executive one-pager": "execpanel" in low and "renderexec" in low,
         "Sustainability SBT glide path": "chsbt" in low,
     }

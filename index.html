@@ -208,6 +208,7 @@
     <button data-view="fc">🏭 Fulfillment Ops</button>
     <button data-view="procure">🧾 Procurement</button>
     <button data-view="supplier">🤝 Suppliers</button>
+    <button data-view="returns">🔄 Returns</button>
   </nav>
   <div class="badge">AI-Assisted · Live</div>
   <button class="iconbtn" id="themeBtn" aria-label="Switch to light theme" title="Toggle light / dark theme" onclick="toggleTheme()">◐</button>
@@ -682,6 +683,18 @@
     <div class="card"><h2>Dual-source coverage <span class="sub">single points of failure</span></h2><div id="spDual"></div></div>
   </div>
   <div class="card"><h2>Supplier scorecard</h2><table><thead><tr><th scope="col">Supplier</th><th scope="col">Commodity</th><th scope="col">Mode</th><th scope="col" class="num">Avg LT (d)</th><th scope="col" class="num">Target</th><th scope="col" class="num">On-time</th><th scope="col" class="num">Variability</th><th scope="col">Grade</th></tr></thead><tbody id="spBody"></tbody></table></div>
+</div>
+<!-- ===================== RETURNS & REVERSE LOGISTICS ===================== -->
+<div class="view" id="view-returns">
+  <div class="card"><h2>Returns &amp; reverse logistics <span class="sub">return rates, reverse-flow cost, disposition &amp; RMA aging</span></h2>
+    <div class="kgrid" id="rtKpis"></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Disposition mix <span class="sub">where returned units end up</span></h2><div class="chartbox"><canvas id="chRtDispo"></canvas></div></div>
+    <div class="card"><h2>RMA aging <span class="sub">open return-merchandise authorizations</span></h2><div class="chartbox"><canvas id="chRtAge"></canvas></div></div>
+  </div>
+  <div class="card"><h2>Returns by reason</h2><div id="rtReasons"></div></div>
+  <div class="card"><h2>Return rate &amp; reverse cost by lane <span class="sub">worst offenders first</span></h2><div id="rtLanes"></div></div>
+  <div class="card"><h2>Open RMA queue <span class="sub">oldest first</span></h2><table><thead><tr><th scope="col">RMA</th><th scope="col">Shipment</th><th scope="col">Lane</th><th scope="col">Commodity</th><th scope="col">Reason</th><th scope="col">Disposition</th><th scope="col" class="num">Units</th><th scope="col" class="num">Net cost</th><th scope="col" class="num">Age (d)</th><th scope="col">Status</th></tr></thead><tbody id="rtBody"></tbody></table></div>
 </div>
 </div><!-- /main -->
 
@@ -1598,6 +1611,47 @@ function genExtra(){
   const defs=[['LAX DC1','US West','Los Angeles'],['ORD DC2','US Central','Chicago'],['DFW DC3','US South','Dallas'],['ATL DC4','US Southeast','Atlanta'],['EWR DC5','US East','New York'],['SEA DC6','US Northwest','Seattle']];
   FCS=defs.map(([name,region,city])=>{const cap=sint(180,520)*1000,util=0.6+sr()*0.36,thr=Math.round(cap*util),assoc=Math.round(thr/(90+sr()*70)/8),ot=Math.round((92+sr()*7)*10)/10,cu=Math.round((2.1+sr()*1.9)*100)/100;return {name,region,city,cap,thr,util,assoc,ot,cu};});
 }
+/* ---- Returns & reverse logistics (A2) — seeded, derived from delivered shipments ---- */
+let RETURNS=[];
+const RET_REASONS=['Damaged in transit','Defective','Wrong item','Customer remorse','Late delivery','Warranty claim'];
+const RET_DISPO=['Restock','Refurbish','Return to vendor','Recycle','Scrap'];
+const DISPO_COL={Restock:'#34d399',Refurbish:'#22d3ee','Return to vendor':'#a78bfa',Recycle:'#fbbf24',Scrap:'#f87171'};
+const DISPO_REC={Restock:0.9,Refurbish:0.55,'Return to vendor':0.65,Recycle:0.08,Scrap:0.02};
+const DISPO_PROC={Restock:2,Refurbish:9,'Return to vendor':4,Recycle:3,Scrap:1};
+function genReturns(){
+  _seed=135792468;RETURNS=[];let n=0;
+  SHIPMENTS.filter(s=>s.status==='Delivered').forEach(s=>{
+    const com=COM[s.commodity]||COMMODITIES[0];
+    const unitKg=com.vk>40?2:com.vk>10?10:40, unitVal=Math.round(com.vk*unitKg);
+    const unitsShipped=Math.max(10,Math.round(s.weightKg/unitKg));
+    let base=com.vk>30?0.05:com.vk>10?0.03:0.008;
+    if(s.commodity==='Apparel')base+=0.06;
+    if(s.inFull===false)base+=0.03;
+    if(s.onTime===false)base+=0.02;
+    const rate=Math.min(0.22,base*(0.7+sr()*0.7));
+    const unitsRet=Math.round(unitsShipped*rate);
+    if(unitsRet<1)return;
+    let reason;
+    if(s.inFull===false&&sr()<0.5)reason='Wrong item';
+    else if(s.onTime===false&&sr()<0.4)reason='Late delivery';
+    else reason=spick(RET_REASONS);
+    let dispo;
+    if(reason==='Damaged in transit')dispo=spick(['Recycle','Scrap','Refurbish']);
+    else if(reason==='Defective'||reason==='Warranty claim')dispo=spick(['Return to vendor','Refurbish','Scrap']);
+    else if(reason==='Customer remorse')dispo=spick(['Restock','Restock','Refurbish']);
+    else dispo=spick(['Restock','Refurbish','Return to vendor']);
+    const revFreight=Math.round(unitsRet*unitVal*0.05 + unitsRet*s.dist*0.0008);
+    const processCost=Math.round(unitsRet*(DISPO_PROC[dispo]||3));
+    const recovery=Math.round(unitsRet*unitVal*DISPO_REC[dispo]);
+    const lostValue=Math.round(unitsRet*unitVal*(1-DISPO_REC[dispo]));
+    const ageDays=sint(1,75);
+    RETURNS.push({rma:'RMA-'+(2000+n),ship:s.id,lane:s.o+' → '+s.d,o:s.o,d:s.d,mode:s.mode,commodity:s.commodity,customer:s.customer,
+      unitsShipped,unitsRet,rate,reason,dispo,unitVal,revFreight,processCost,recovery,
+      netCost:revFreight+processCost+lostValue,
+      ageDays,status:ageDays>45?'Aging':ageDays>20?'In process':'New'});
+    n++;
+  });
+}
 // --- Sustainability ---
 function renderSustain(){
   const byMode={},byLane={};SHIPMENTS.forEach(s=>{byMode[s.mode]=(byMode[s.mode]||0)+s.co2;const ln=s.o+' → '+s.d;byLane[ln]=(byLane[ln]||0)+s.co2;});
@@ -1747,6 +1801,28 @@ function renderSupplier(){
   $('spBody').innerHTML=sup.map(s=>`<tr><td><b>${esc(s.supplier)}</b></td><td>${s.commodity}</td><td><span class="modetag" style="background:${MODECOL[s.mode]}">${s.mode}</span></td><td class="num">${s.mean.toFixed(1)}</td><td class="num">${s.target}</td><td class="num">${pct(s.otd)}</td><td class="num">${Math.round(s.cv)}%</td><td><span class="grade ${gradeCol(s.grade)}">${s.grade}</span></td></tr>`).join('');
   $('spDual').innerHTML=single.length?`<table><thead><tr><th>Single-source commodity</th><th>Sole supplier</th><th>Risk</th></tr></thead><tbody>${single.map(e=>`<tr><td><b>${e[0]}</b></td><td>${e[1][0]}</td><td><span class="pill rag-r">single point</span></td></tr>`).join('')}</tbody></table>`:'<div class="hint">No single-source commodities — healthy dual-source coverage.</div>';
 }
+function renderReturns(){
+  const R=(typeof RETURNS!=='undefined')?RETURNS:[];
+  const totRet=R.reduce((a,r)=>a+r.unitsRet,0), totShip=R.reduce((a,r)=>a+r.unitsShipped,0);
+  const rate=totShip?totRet/totShip*100:0;
+  const revCost=R.reduce((a,r)=>a+r.revFreight+r.processCost,0), recovery=R.reduce((a,r)=>a+r.recovery,0), netCost=R.reduce((a,r)=>a+r.netCost,0);
+  const open=R.filter(r=>r.status!=='Closed');
+  kpiGrid('rtKpis',[['Return rate',pct(rate),'of units'],['Units returned',fmt(totRet),''],['Reverse-flow cost',f$(revCost),''],['Value recovered',f$(recovery),''],['Net cost of returns',f$(netCost),''],['Open RMAs',open.length,'']]);
+  const byDispo={};R.forEach(r=>byDispo[r.dispo]=(byDispo[r.dispo]||0)+r.unitsRet);
+  const dord=RET_DISPO.filter(d=>byDispo[d]);
+  mkChart('chRtDispo',{type:'doughnut',data:{labels:dord,datasets:[{data:dord.map(d=>byDispo[d]),backgroundColor:dord.map(d=>DISPO_COL[d])}]},options:{plugins:{legend:{position:'right'},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)+' units'}}}}});
+  const buckets=[['0–15 d',0,15],['16–30 d',16,30],['31–60 d',31,60],['60+ d',61,99999]];
+  const ageCounts=buckets.map(b=>open.filter(r=>r.ageDays>=b[1]&&r.ageDays<=b[2]).length);
+  mkChart('chRtAge',{type:'bar',data:{labels:buckets.map(b=>b[0]),datasets:[{label:'Open RMAs',data:ageCounts,backgroundColor:buckets.map((b,i)=>i>=3?'#f87171':i===2?'#fbbf24':'#34d399')}]},options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'open RMAs'},ticks:{precision:0}}}}});
+  const byReason={};R.forEach(r=>{const a=byReason[r.reason]=byReason[r.reason]||{n:0,units:0,cost:0};a.n++;a.units+=r.unitsRet;a.cost+=r.netCost;});
+  const reasons=Object.entries(byReason).sort((a,b)=>b[1].units-a[1].units);
+  $('rtReasons').innerHTML=`<table><thead><tr><th>Reason</th><th class="num">RMAs</th><th class="num">Units</th><th class="num">% of returns</th><th class="num">Net cost</th></tr></thead><tbody>${reasons.map(([k,v])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${v.n}</td><td class="num">${fmt(v.units)}</td><td class="num">${pct(totRet?v.units/totRet*100:0)}</td><td class="num">${f$(v.cost)}</td></tr>`).join('')||'<tr><td colspan="5" class="hint">No returns on record.</td></tr>'}</tbody></table>`;
+  const byLane={};R.forEach(r=>{const a=byLane[r.lane]=byLane[r.lane]||{lane:r.lane,mode:r.mode,ship:0,ret:0,cost:0};a.ship+=r.unitsShipped;a.ret+=r.unitsRet;a.cost+=r.revFreight+r.processCost;});
+  const lanes=Object.values(byLane).map(l=>Object.assign(l,{lrate:l.ship?l.ret/l.ship*100:0})).sort((a,b)=>b.lrate-a.lrate).slice(0,12);
+  $('rtLanes').innerHTML=`<table><thead><tr><th>Lane</th><th>Mode</th><th class="num">Returned</th><th class="num">Return rate</th><th class="num">Reverse cost</th><th>Flag</th></tr></thead><tbody>${lanes.map(l=>`<tr><td>${esc(l.lane)}</td><td><span class="modetag" style="background:${MODECOL[l.mode]}">${l.mode}</span></td><td class="num">${fmt(l.ret)}</td><td class="num">${pct(l.lrate)}</td><td class="num">${f$(l.cost)}</td><td>${l.lrate>10?'<span class="pill rag-r">high</span>':l.lrate>5?'<span class="pill rag-a">watch</span>':'<span class="pill rag-g">low</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="hint">No returns on record.</td></tr>'}</tbody></table>`;
+  const q=open.slice().sort((a,b)=>b.ageDays-a.ageDays).slice(0,14);
+  $('rtBody').innerHTML=q.map(r=>`<tr><td><b>${esc(r.rma)}</b></td><td>${esc(r.ship)}</td><td>${esc(r.lane)}</td><td>${esc(r.commodity)}</td><td>${esc(r.reason)}</td><td>${esc(r.dispo)}</td><td class="num">${fmt(r.unitsRet)}</td><td class="num">${f$(r.netCost)}</td><td class="num">${r.ageDays}</td><td><span class="pill ${r.status==='Aging'?'rag-r':r.status==='In process'?'rag-a':'rag-g'}">${r.status}</span></td></tr>`).join('')||'<tr><td colspan="10" class="hint">No open RMAs.</td></tr>';
+}
 function renderExec(){
   if(!$('execPanel'))return;
   const dv=delivered(), act=active();
@@ -1758,7 +1834,7 @@ function renderExec(){
   $('execPanel').innerHTML=cells.map(c=>`<div style="flex:1;min-width:120px;border-left:3px solid var(--accent);padding:2px 0 2px 10px"><div style="font-size:11px;color:var(--muted)">${c[0]}</div><div style="font-size:20px;font-weight:800">${c[1]}</div></div>`).join('');
   $('execNarr').innerHTML=`<b>Biggest cost leak:</b> ${leak?esc(leak.lane)+' ('+leak.mode+') overpaying '+f$(leak.va):'none'}. &nbsp;<b>Top exceptions:</b> ${top.length?top.map(s=>esc(s.id)+' · '+esc(s.exc||'')).join(' &nbsp;|&nbsp; '):'none — network clean'}.`;
 }
-const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData,sustain:renderSustain,risk:renderRisk,demand:renderDemand,fc:renderFC,procure:renderProcure,supplier:renderSupplier};
+const RENDER={control:renderControl,perf:renderPerf,cost:renderCost,data:renderData,sustain:renderSustain,risk:renderRisk,demand:renderDemand,fc:renderFC,procure:renderProcure,supplier:renderSupplier,returns:renderReturns};
 function showView(name){CURVIEW=name;if(name!=='control'&&ctSim.on)stopCTSim();document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===name));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$('view-'+name).classList.add('active');
   if(RENDER[name])RENDER[name]();
   if(name==='control'&&ctMap)setTimeout(()=>{ctMap.invalidateSize();drawCTMap(SHIPMENTS.filter(s=>s.status!=='Delivered'));},60);
@@ -1767,7 +1843,7 @@ function wireNav(){document.querySelectorAll('nav button').forEach(b=>b.onclick=
 
 window.addEventListener('load',()=>{
   initTheme();
-  const _sv=loadShipments();if(_sv){SHIPMENTS=_sv;}else{genShipments();saveShipments();}genLeadtime();genExtra();
+  const _sv=loadShipments();if(_sv){SHIPMENTS=_sv;}else{genShipments();saveShipments();}genLeadtime();genExtra();genReturns();
   initCTMap();initMap();
   fillCommodity();
   wireNav();wireControl();wireCost();wireOpt();wireRouting();wirePlanner();wireGlobal();wireData();wireChat();wireExtra();
