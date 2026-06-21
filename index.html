@@ -554,7 +554,7 @@
 
 <!-- ===================== DATA & REPORTS ===================== -->
 <div class="view" id="view-data">
-  <div class="card"><h2>Data sources &amp; ERP connectors <span class="sub">import history for lead-time analytics</span></h2>
+  <div class="card"><h2>Data sources &amp; ERP connectors <span class="sub">import lead-time history, carriers &amp; lanes</span></h2>
     <div class="grid4" id="connCards"></div>
     <div class="row" style="margin-top:12px">
       <button class="ghost btn" id="erpImportBtn" style="flex:0 0 auto;padding:9px 16px">⬆ Import lead-time history (Excel/CSV)</button>
@@ -562,7 +562,16 @@
       <input type="file" id="erpFile" accept=".xlsx,.xls,.csv" style="display:none" />
       <span style="flex:1"></span>
     </div>
-    <div class="hint" id="erpNote" style="margin-top:8px">Demo connectors are illustrative. Import your own lead-time export to drive the analytics below.</div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost btn" id="carrierImportBtn" style="flex:0 0 auto;padding:9px 16px">⬆ Import carriers</button>
+      <button class="ghost btn" id="carrierTemplate" style="flex:0 0 auto;padding:9px 16px">⬇ Template</button>
+      <input type="file" id="carrierFile" accept=".xlsx,.xls,.csv" style="display:none" />
+      <button class="ghost btn" id="laneImportBtn" style="flex:0 0 auto;padding:9px 16px">⬆ Import lanes</button>
+      <button class="ghost btn" id="laneTemplate" style="flex:0 0 auto;padding:9px 16px">⬇ Template</button>
+      <input type="file" id="laneFile" accept=".xlsx,.xls,.csv" style="display:none" />
+      <span style="flex:1"></span>
+    </div>
+    <div class="hint" id="erpNote" style="margin-top:8px">Demo connectors are illustrative. Import your own lead-time export to drive the analytics below; importing carriers or lanes refreshes the shipment register.</div>
   </div>
   <div class="grid2">
     <div class="card"><h2>Lead-time history &amp; variability</h2><div class="chartbox" style="height:240px"><canvas id="chLeadHist"></canvas></div><div class="grid4" id="leadStats" style="margin-top:12px"></div></div>
@@ -891,6 +900,38 @@ function validateImport(rows,required){
   let skipped=0;const valid=rows.filter(r=>{const good=required.every(c=>String(r[c]!=null?r[c]:'').trim()!=='');if(!good)skipped++;return good;});
   return {ok:valid.length>0,missing:[],valid,skipped};
 }
+/* ---- Universal table import (C6): one engine, per-table required-column specs ---- */
+// Generic importer: validate required columns, map rows (map may return null to skip), apply, report uniformly.
+function importTable(file,spec){importXlsx(file,rows=>{
+  const vr=validateImport(rows,spec.required);
+  if(vr.missing&&vr.missing.length){toast('Import is missing column(s): '+vr.missing.join(', ')+'. Download the Template for the exact headers.');return;}
+  if(!vr.ok){toast('No valid rows — each needs: '+spec.required.join(', ')+'.');return;}
+  const mapped=[];for(let i=0;i<vr.valid.length;i++){try{const m=spec.map(vr.valid[i],i);if(m!=null)mapped.push(m);}catch(e){}}
+  const skipped=(vr.skipped||0)+(vr.valid.length-mapped.length);
+  if(!mapped.length){toast('No usable rows for '+spec.label+' — check the Template headers/values.');return;}
+  spec.apply(mapped);
+  toast('Imported '+mapped.length+' '+spec.label+(skipped?' ('+skipped+' skipped)':'')+'.');
+});}
+// Download a per-table import template with the exact headers the importer expects.
+function importTemplate(spec){brandedExport(spec.sheet.toLowerCase()+'_template.xlsx',[{name:spec.sheet,rows:spec.template}],spec.label+' import template');toast('Template downloaded — fill rows and Import.');}
+// Reference data (carriers/lanes) feeds the synthetic register; re-derive it and refresh open views after a change.
+function regenFromRefData(){genShipments();saveShipments();renderControl();if(typeof renderPerf==='function')renderPerf();if(typeof renderCost==='function')renderCost();const sel=$('ctCarrier');if(sel)sel.innerHTML='<option value="">All carriers</option>'+CARRIERS.map(c=>'<option>'+esc(c.name)+'</option>').join('');}
+// Per-table specs: each declares its own required-column set, row mapper, apply step, and template headers.
+const IMPORT_SPECS={
+  carriers:{label:'carriers',sheet:'Carriers',required:['Name','Mode'],
+    map:r=>{const nm=String(r.Name!=null?r.Name:(r.name||'')).trim();if(!nm)return null;const md=r.Mode||r.mode||'Ocean';const u=v=>Math.max(0,Math.min(1,+v||0));
+      return{name:nm,mode:MODESPEED[md]?md:'Ocean',rel:u(r.Reliability!=null?r.Reliability:r.rel)||.9,tender:u(r.Tender!=null?r.Tender:r.tender)||.95,dmg:+(r.Damage!=null?r.Damage:r.dmg)||.005,cpm:+(r.CPM!=null?r.CPM:r.cpm)||2.5};},
+    apply:rows=>{CARRIERS.length=0;rows.forEach(c=>CARRIERS.push(c));regenFromRefData();},
+    template:[{Name:'Maersk',Mode:'Ocean',Reliability:.94,Tender:.97,Damage:.004,CPM:2.8},{Name:'DHL Express',Mode:'Air',Reliability:.97,Tender:.98,Damage:.003,CPM:6.4}]},
+  lanes:{label:'lanes',sheet:'Lanes',required:['Origin','Destination','Mode'],
+    map:r=>{const o=String(r.Origin||r.origin||'').trim(),d=String(r.Destination||r.destination||'').trim();if(!COORD[o]||!COORD[d])return null;const md=r.Mode||r.mode||'Ocean';return[o,d,MODESPEED[md]?md:'Ocean',r.Commodity||r.commodity||'Electronics'];},
+    apply:rows=>{LANES.length=0;rows.forEach(l=>LANES.push(l));regenFromRefData();},
+    template:[{Origin:'Shanghai',Destination:'Los Angeles',Mode:'Ocean',Commodity:'Electronics'},{Origin:'Frankfurt',Destination:'New York',Mode:'Air',Commodity:'Pharma'}]},
+  leadtime:{label:'lead-time records',sheet:'LeadTime',required:['supplier','lane','lt'],
+    map:r=>({supplier:r.supplier||r.Supplier||'—',lane:r.lane||r.Lane||'—',commodity:r.commodity||r.Commodity||'—',mode:r.mode||r.Mode||'Ocean',lt:+(r.lt||r.LT||r.leadtime)||10,target:+(r.target||r.Target)||12}),
+    apply:rows=>{LEADTIME=rows;renderLead();},
+    template:[{supplier:'Shanghai',lane:'Shanghai → Los Angeles',commodity:'Electronics',mode:'Ocean',lt:24,target:26}]}
+};
 // Branded Excel export: prepends an "About" cover sheet and auto-sizes columns.
 function brandedExport(filename,sheets,title){
   const cover={name:'About',rows:[
@@ -1588,8 +1629,12 @@ function exportReport(type){if(!REPORT.rows.length){toast('Generate a report fir
   else exportXlsx('report_'+REPORT.dim.toLowerCase()+'.xlsx',[{name:'Report',rows}]),toast('Excel report downloaded.');}
 function wireData(){
   renderConns();
-  $('erpImportBtn').onclick=()=>$('erpFile').click();$('erpTemplate').onclick=()=>{exportXlsx('leadtime_template.xlsx',[{name:'LeadTime',rows:[{supplier:'Shanghai',lane:'Shanghai → Los Angeles',commodity:'Electronics',mode:'Ocean',lt:24,target:26}]}]);toast('Template downloaded.');};
-  $('erpFile').onchange=e=>{const f=e.target.files[0];if(!f)return;importXlsx(f,rows=>{if(!rows.length)return;LEADTIME=rows.map(r=>({supplier:r.supplier||r.Supplier||'—',lane:r.lane||r.Lane||'—',commodity:r.commodity||r.Commodity||'—',mode:r.mode||r.Mode||'Ocean',lt:+(r.lt||r.LT||r.leadtime)||10,target:+(r.target||r.Target)||12}));toast(`Imported ${LEADTIME.length} lead-time records.`);renderLead();});};
+  $('erpImportBtn').onclick=()=>$('erpFile').click();$('erpTemplate').onclick=()=>importTemplate(IMPORT_SPECS.leadtime);
+  $('erpFile').onchange=e=>{const f=e.target.files[0];if(f)importTable(f,IMPORT_SPECS.leadtime);e.target.value='';};
+  $('carrierImportBtn').onclick=()=>$('carrierFile').click();$('carrierTemplate').onclick=()=>importTemplate(IMPORT_SPECS.carriers);
+  $('carrierFile').onchange=e=>{const f=e.target.files[0];if(f)importTable(f,IMPORT_SPECS.carriers);e.target.value='';};
+  $('laneImportBtn').onclick=()=>$('laneFile').click();$('laneTemplate').onclick=()=>importTemplate(IMPORT_SPECS.lanes);
+  $('laneFile').onchange=e=>{const f=e.target.files[0];if(f)importTable(f,IMPORT_SPECS.lanes);e.target.value='';};
   $('ivRun').onclick=runInventory;
   $('rpDataset').onchange=()=>{fillReportSelects();runReport();};$('rpRun').onclick=runReport;
   $('rpExport').onclick=()=>exportReport('xlsx');$('rpCsv').onclick=()=>exportReport('csv');$('rpPrint').onclick=()=>window.print();
