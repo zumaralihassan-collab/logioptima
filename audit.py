@@ -87,6 +87,7 @@ def audit(fp):
         "Returns & Reverse Logistics": "view-returns" in low and "renderreturns" in low,
         "Executive one-pager": "execpanel" in low and "renderexec" in low,
         "Sustainability SBT glide path": "chsbt" in low,
+        "Copilot function-calling (E1)": "copilotaction" in low and "parseintent" in low,
     }
     for name, present in feat.items():
         add("feat:" + name, "Features", 3, present, name, "Implement '" + name + "'")

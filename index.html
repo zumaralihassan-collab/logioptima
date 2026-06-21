@@ -1567,6 +1567,34 @@ function opsSummary(){const dv=delivered();const otif=avg(dv.map(s=>(s.onTime&&s
   return{otif,otd,inTransit:SHIPMENTS.filter(s=>s.status==='In Transit').length,exc,atRisk,dnd,over,loss,la,worst,cts};}
 function ctxBlob(){const o=opsSummary();return `LIVE STATE — OTIF ${o.otif.toFixed(0)}%, OTD ${o.otd.toFixed(0)}%, ${o.inTransit} in transit, ${o.exc.length} open exceptions, ${o.atRisk.length} at-risk (risk≥60). D&D leak ${f$(o.dnd)}; freight overspend vs should-cost ${f$(o.over)} across ${o.la.length} flagged lanes. Worst SLA carrier: ${o.worst?o.worst.name+' '+o.worst.otd.toFixed(0)+'% OTD':'n/a'}. Loss-making customers: ${o.loss.map(c=>c.name).join(', ')||'none'}. ${SHIPMENTS.length} shipments across Ocean/Air/Rail/Road. Crude chokepoints (EIA 2024 Mb/d): Hormuz 20, Malacca 22.5, Suez+SUMED 4.8, Bab-el-Mandeb 4.1. Incoterms 2020: 11 rules; risk transfers earliest at EXW, latest at DDP.`;}
 function findInco(t){const codes=['exw','fca','fas','fob','cfr','cif','cpt','cip','dap','dpu','ddp'];return codes.filter(c=>new RegExp('\\b'+c+'\\b','i').test(t)).map(c=>INC[c.toUpperCase()]);}
+/* E1 — lightweight copilot function-calling: recognise a few natural-language
+   commands and invoke the existing actions (excAction / runDisruption) with a
+   confirmation toast. parseIntent is a pure parser (unit-tested in logic_test.js);
+   copilotAction does the side-effecting dispatch. */
+function parseIntent(q){const t=(q||'').toLowerCase();
+  if((/\brun\b|simulat|\bmodel\b|what\s*if|\bsim\b/.test(t))&&(/disrupt|scenario|closure|blockage|strike|insolven|hormuz|red\s*sea|suez|panama|malacca|chokepoint/.test(t))){
+    const SIMK=[[/hormuz/,'hormuz'],[/red\s*sea|suez/,'redsea'],[/panama/,'panama'],[/malacca/,'malacca'],[/\bstrike\b|west\s*coast|port\s*strike/,'strike'],[/carrier\s*(insolven|bankrupt|fail)|insolven/,'carrier']];
+    const hit=SIMK.find(k=>k[0].test(t));return {kind:'sim',key:hit?hit[1]:null};}
+  if(/shp|shipment/.test(t)){const m=t.match(/shp[-\s]?(\d{3,5})/);const id=m?'SHP-'+m[1]:null;
+    if(/\brerout|re-rout|divert/.test(t))return {kind:'ship',act:'reroute',id};
+    if(/switch\s*carrier|change\s*carrier|swap\s*carrier|new\s*carrier|re-?tender/.test(t))return {kind:'ship',act:'switch',id};
+    if(/demurrage|detention|d\s*&\s*d|\bd&d\b/.test(t))return {kind:'ship',act:'dnd',id};
+    if(/\b(open|show|view|details?|look\s*up|pull\s*up)\b/.test(t))return {kind:'ship',act:'open',id};}
+  return null;}
+function copilotAction(q){const it=parseIntent(q);if(!it)return false;
+  if(it.kind==='sim'){
+    if(!it.key){botSay('I can run these disruption simulations: '+Object.keys(DISRUPTIONS).map(k=>DISRUPTIONS[k].n).join('; ')+'. Try "run the Hormuz simulation".');return true;}
+    const d=DISRUPTIONS[it.key],sel=$('riskSel');
+    if(!sel.options.length)sel.innerHTML=Object.keys(DISRUPTIONS).map(k=>'<option value="'+k+'">'+DISRUPTIONS[k].n+'</option>').join('');
+    sel.value=it.key;toast('Running the '+d.n+' simulation…');showView('risk');return true;}
+  if(it.kind==='ship'){
+    if(!it.id){botSay('Which shipment? Name an ID like "reroute SHP-1049".');return true;}
+    const s=SHIPMENTS.find(x=>x.id===it.id);
+    if(!s){botSay(it.id+" isn't in the current shipment set (IDs run SHP-1000 to SHP-"+(1000+SHIPMENTS.length-1)+").");return true;}
+    if(it.act==='open'){showView('control');excAction('open',it.id);botSay('🔎 Opened '+it.id+' in the Control Tower.');return true;}
+    const verb={reroute:'Rerouting',switch:'Switching carrier on',dnd:'Filing a D&D dispute for'}[it.act];
+    botSay('🤖 '+verb+' '+it.id+' — applying now.');excAction(it.act,it.id);return true;}
+  return false;}
 function offline(q){const t=q.toLowerCase();const o=opsSummary();
   if(/summary|summari|how are|operations|overview|biggest risk|whats happening|what's happening/.test(t)){const e=o.exc.slice(0,3).map(s=>`${s.id} (${esc(s.exc)})`).join(', ');return `Ops snapshot: OTIF ${o.otif.toFixed(0)}% · OTD ${o.otd.toFixed(0)}% · ${o.inTransit} in transit · ${o.exc.length} open exceptions · ${o.atRisk.length} at-risk. Top exceptions: ${e||'none'}. Silent leaks: D&D ${f$(o.dnd)} and ${f$(o.over)} freight overspend vs should-cost. Start in the Exception Inbox, then audit the flagged lanes in Cost Intelligence.`;}
   if(/bled money|losing money|lost money|unprofitable|cost.to.serve|cost to serve|margin|where.*money/.test(t)){if(!o.loss.length)return `No accounts are currently loss-making — lowest margin is ${o.cts[0].name} at ${f1(o.cts[0].mpc)}%. Check Cost Intelligence → Cost-to-Serve to see margin by customer, lane and commodity.`;return `These are bleeding money (negative margin after logistics + D&D): ${o.loss.map(c=>c.name+' '+f$(c.margin)).join(', ')}. Biggest driver is freight overspend (${f$(o.over)}) and D&D (${f$(o.dnd)}). Re-rate the lanes, renegotiate, or re-mode them — see Cost-to-Serve and Should-Move Cost.`;}
@@ -1582,7 +1610,9 @@ function offline(q){const t=q.toLowerCase();const o=opsSummary();
   if(/my route|current route|explain.*route|improve|hub|facility|center of gravity/.test(t)){if(PLAN.mode==='route')return `Your ${PLAN.transport} route covers ${PLAN.order.length-1} cities in ${fmt(PLAN.km)} km (~${f$(PLAN.cost)}, ${(PLAN.hours/24).toFixed(1)} days). Longest leg: ${PLAN.maxPair}. It's TSP-optimal; switch a long leg to a cheaper mode or add a consolidation stop.`;if(PLAN.mode==='hub')return `You opened ${PLAN.hubs.join(', ')} serving ${PLAN.demand} cities (${fmt(PLAN.total)} km). Add a hub to cut average distance or compare to the center-of-gravity DC.`;return 'Use Global & Crude → World planner: add cities, mark an ORIGIN, and Optimize.';}
   if(/hello|^hi|hey/.test(t))return "Hey Zumar! Ask me for an ops summary, which lanes bled money, an Incoterm, or to interpret your solver's sensitivity report.";
   return "I'm the offline copilot — strongest on your live ops (OTIF/SLA/exceptions), cost intelligence, the solver's sensitivity, crude routing, Incoterms and lead times. Add an API key (⚙) for full real-time AI on anything.";}
-async function ask(q){if(!q.trim())return;userSay(q);$('chatInput').value='';const key=localStorage.getItem('lo_key');
+async function ask(q){if(!q.trim())return;userSay(q);$('chatInput').value='';
+  if(copilotAction(q))return;
+  const key=localStorage.getItem('lo_key');
   if(!key){setTimeout(()=>botSay(offline(q)),220);return;}
   const th=document.createElement('div');th.className='msg bot';th.textContent='…';$('chatlog').appendChild(th);
   try{const res=await fetch(localStorage.getItem('lo_url'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:localStorage.getItem('lo_model'),messages:[{role:'system',content:"You are the copilot inside Zumar's Logic-tics Stop, a transportation & logistics optimization suite. Be concise and practical. Use this live context for in-scope questions, and answer general questions too. "+ctxBlob()},{role:'user',content:q}]})});const j=await res.json();th.remove();botSay(j.choices?.[0]?.message?.content||('Error: '+(j.error?.message||'no response')));}

@@ -112,6 +112,14 @@ const TESTS = `
     if (typeof carrierStats==='function'){ var _cs=carrierStats(); ok(Array.isArray(_cs)&&_cs.length>0, 'carrierStats returns rows ('+_cs.length+')'); ok(_cs.every(function(c){return c.otd>=0&&c.otd<=100;}), 'carrierStats OTD within 0-100%'); }
   }
   if (typeof DISRUPTIONS==='object' && DISRUPTIONS.hormuz){ ok(DISRUPTIONS.hormuz.addDays>0 && DISRUPTIONS.hormuz.mult>1, 'DISRUPTIONS.hormuz adds delay and cost'); }
+  // 10) optional: copilot intent parser (E1)
+  if (typeof parseIntent==='function'){
+    var _ri=parseIntent('reroute SHP-1049');
+    ok(_ri && _ri.kind==='ship' && _ri.act==='reroute' && _ri.id==='SHP-1049', 'parseIntent maps "reroute SHP-1049" -> reroute SHP-1049');
+    var _si=parseIntent('run the hormuz simulation');
+    ok(_si && _si.kind==='sim' && _si.key==='hormuz', 'parseIntent maps "run hormuz simulation" -> hormuz scenario');
+    ok(parseIntent('which lanes bled money last quarter and why?')===null, 'parseIntent ignores non-action queries');
+  }
   console.log('\\nLOGIC: '+passes+' passed, '+failures+' failed.');
   if(failures>0) process.exitCode=1;
 })();
